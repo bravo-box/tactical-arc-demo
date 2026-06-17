@@ -18,6 +18,8 @@ How to decide who handles what.
 | Code review | Ripley | Review PRs, check quality, suggest improvements |
 | Testing | Hudson | Write tests, find edge cases, verify fixes |
 | Scope & priorities | Ripley | What to build next, trade-offs, decisions |
+| Security & compliance | Burke | Security reviews, secrets, RBAC, network hardening, container scanning |
+| Documentation | Newt | README, architecture docs, guides, keeping docs in sync |
 | Session logging | Scribe | Automatic — never needs routing |
 | RAI review | Rai | Content safety, bias checks, credential detection, ethical review |
 

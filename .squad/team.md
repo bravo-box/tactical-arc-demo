@@ -17,6 +17,8 @@
 | Hicks | Backend Dev | .squad/agents/hicks/charter.md | 🔧 Backend |
 | Vasquez | Edge Dev | .squad/agents/vasquez/charter.md | 📡 Edge |
 | Hudson | Tester | .squad/agents/hudson/charter.md | 🧪 Test |
+| Newt | Technical Writer | .squad/agents/newt/charter.md | 📝 Docs |
+| Burke | Security Engineer | .squad/agents/burke/charter.md | 🔒 Security |
 | Scribe | Session Logger | .squad/agents/scribe/charter.md | 📋 Scribe |
 | Ralph | Work Monitor | .squad/agents/ralph/charter.md | 🔄 Ralph |
 | Rai | RAI Reviewer | .squad/agents/Rai/charter.md | 🛡️ RAI |
