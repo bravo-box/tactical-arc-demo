@@ -26,6 +26,10 @@
       "version": "latest",
       "helm": "latest",
       "minikube": "none"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest",
+      "installDirectlyFromGitHubRelease": true
     }
   },
   "customizations": {
@@ -49,6 +53,6 @@
       }
     }
   },
-  "postCreateCommand": "pip install -r cloud-app/api/requirements.txt 2>/dev/null || true",
+  "postCreateCommand": "pip install -r cloud-app/api/requirements.txt 2>/dev/null || true && gh extension install github/gh-copilot || true",
   "remoteUser": "vscode"
 }
