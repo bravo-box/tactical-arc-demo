@@ -1,0 +1,14 @@
+apiVersion: v2
+name: cloud-api
+description: Tactical ARC Demo - Cloud API Service for AKS deployment on Azure Government
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - tactical-arc
+  - azure-government
+  - aks
+  - arc
+home: https://github.com/bravo-box/tactical-arc-demo
+maintainers:
+  - name: tactical-arc-demo

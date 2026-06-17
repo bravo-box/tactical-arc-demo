@@ -1,0 +1,212 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup: Initialize Environment",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/setup.sh"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build: Cloud App",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/build.sh", "--target", "cloud"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build: Local App",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/build.sh", "--target", "local"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build: All",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/build.sh", "--target", "all"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Deploy: Infrastructure (Terraform)",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/deploy.sh", "--target", "infra"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Deploy: Cloud App (Helm)",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/deploy.sh", "--target", "cloud"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Deploy: All",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/deploy.sh", "--target", "all"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Infra: Terraform Init",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/terraform.sh", "init"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Infra: Terraform Plan",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/terraform.sh", "plan"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Infra: Terraform Apply",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/terraform.sh", "apply"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Infra: Terraform Destroy",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/terraform.sh", "destroy"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: Login to ACR",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/docker-login.sh"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Kubernetes: Get AKS Credentials",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/get-aks-credentials.sh"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Hardware: Setup Jetson Nano",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/hardware-scripts/jetson-setup.sh"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Hardware: Update Jetson Nano",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/hardware-scripts/jetson-update.sh"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Cloud: Run API Locally",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/cloud-app/scripts/run-local.sh"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Local App: Run Agent Locally",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/local-app/agent/run-local.sh"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
