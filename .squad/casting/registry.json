@@ -1,0 +1,44 @@
+{
+  "agents": {
+    "ripley": {
+      "persistent_name": "Ripley",
+      "universe": "Alien",
+      "role": "Lead/Architect",
+      "created_at": "2026-06-17T20:40:13Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "bishop": {
+      "persistent_name": "Bishop",
+      "universe": "Alien",
+      "role": "Infra/DevOps",
+      "created_at": "2026-06-17T20:40:13Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "hicks": {
+      "persistent_name": "Hicks",
+      "universe": "Alien",
+      "role": "Backend Dev",
+      "created_at": "2026-06-17T20:40:13Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "vasquez": {
+      "persistent_name": "Vasquez",
+      "universe": "Alien",
+      "role": "Edge Dev",
+      "created_at": "2026-06-17T20:40:13Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "hudson": {
+      "persistent_name": "Hudson",
+      "universe": "Alien",
+      "role": "Tester",
+      "created_at": "2026-06-17T20:40:13Z",
+      "legacy_named": false,
+      "status": "active"
+    }
+  }
+}
