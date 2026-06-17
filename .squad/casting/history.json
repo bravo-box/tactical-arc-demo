@@ -1,0 +1,24 @@
+{
+  "universe_usage_history": [
+    {
+      "universe": "Alien",
+      "assigned_at": "2026-06-17T20:40:13Z",
+      "project": "tactical-arc-demo",
+      "agent_count": 5
+    }
+  ],
+  "assignment_cast_snapshots": {
+    "2026-06-17-initial": {
+      "assignment_id": "2026-06-17-initial",
+      "universe": "Alien",
+      "timestamp": "2026-06-17T20:40:13Z",
+      "agents": {
+        "ripley": "Lead/Architect",
+        "bishop": "Infra/DevOps",
+        "hicks": "Backend Dev",
+        "vasquez": "Edge Dev",
+        "hudson": "Tester"
+      }
+    }
+  }
+}
