@@ -56,6 +56,7 @@
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,readonly"
   ],
-  "postCreateCommand": "pip install -r cloud-app/api/requirements.txt 2>/dev/null || true && gh extension install github/gh-copilot || true",
+
+  "postCreateCommand": "pip install -r cloud-app/api/requirements.txt 2>/dev/null || true && gh extension install github/gh-copilot || true && npm install -g @bradygaster/squad-cli || true",
   "remoteUser": "vscode"
 }
