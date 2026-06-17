@@ -14,13 +14,15 @@ resource "azurerm_resource_group" "main" {
 module "networking" {
   source = "./modules/networking"
 
-  resource_group_name = azurerm_resource_group.main.name
-  location            = var.location
-  project_name        = var.project_name
-  environment         = var.environment
-  vnet_address_space  = var.vnet_address_space
-  aks_subnet_prefix   = var.aks_subnet_prefix
-  tags                = local.common_tags
+  resource_group_name    = azurerm_resource_group.main.name
+  location               = var.location
+  project_name           = var.project_name
+  environment            = var.environment
+  vnet_address_space     = var.vnet_address_space
+  aks_subnet_prefix      = var.aks_subnet_prefix
+  storage_subnet_prefix  = var.storage_subnet_prefix
+  registry_subnet_prefix = var.registry_subnet_prefix
+  tags                   = local.common_tags
 }
 
 module "acr" {
@@ -31,7 +33,23 @@ module "acr" {
   project_name        = var.project_name
   environment         = var.environment
   sku                 = var.acr_sku
+  subnet_id           = module.networking.registry_subnet_id
+  vnet_id             = module.networking.vnet_id
   tags                = local.common_tags
+}
+
+module "storage" {
+  source = "./modules/storage"
+
+  resource_group_name      = azurerm_resource_group.main.name
+  location                 = var.location
+  project_name             = var.project_name
+  environment              = var.environment
+  account_tier             = var.storage_account_tier
+  account_replication_type = var.storage_replication_type
+  subnet_id                = module.networking.storage_subnet_id
+  vnet_id                  = module.networking.vnet_id
+  tags                     = local.common_tags
 }
 
 module "aks" {

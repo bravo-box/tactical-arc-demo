@@ -31,6 +31,18 @@ variable "aks_subnet_prefix" {
   default     = "10.0.1.0/24"
 }
 
+variable "storage_subnet_prefix" {
+  description = "Address prefix for the storage private endpoint subnet"
+  type        = string
+  default     = "10.0.2.0/24"
+}
+
+variable "registry_subnet_prefix" {
+  description = "Address prefix for the container registry private endpoint subnet"
+  type        = string
+  default     = "10.0.3.0/24"
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)

@@ -12,3 +12,13 @@ output "aks_subnet_id" {
   description = "Resource ID of the AKS subnet"
   value       = azurerm_subnet.aks.id
 }
+
+output "storage_subnet_id" {
+  description = "Resource ID of the storage private endpoint subnet"
+  value       = azurerm_subnet.storage.id
+}
+
+output "registry_subnet_id" {
+  description = "Resource ID of the registry private endpoint subnet"
+  value       = azurerm_subnet.registry.id
+}
