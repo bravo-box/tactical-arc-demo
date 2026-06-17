@@ -19,10 +19,16 @@ variable "environment" {
   type        = string
 }
 
-variable "sku" {
-  description = "SKU for the container registry"
+variable "account_tier" {
+  description = "Storage account tier"
   type        = string
-  default     = "Premium"
+  default     = "Standard"
+}
+
+variable "account_replication_type" {
+  description = "Storage account replication type"
+  type        = string
+  default     = "LRS"
 }
 
 variable "subnet_id" {

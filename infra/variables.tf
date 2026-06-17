@@ -45,12 +45,12 @@ variable "aks_kubernetes_version" {
 }
 
 variable "acr_sku" {
-  description = "SKU for Azure Container Registry"
+  description = "SKU for Azure Container Registry (must be Premium for private link)"
   type        = string
-  default     = "Standard"
+  default     = "Premium"
   validation {
-    condition     = contains(["Basic", "Standard", "Premium"], var.acr_sku)
-    error_message = "acr_sku must be one of: Basic, Standard, Premium"
+    condition     = contains(["Premium"], var.acr_sku)
+    error_message = "acr_sku must be Premium to support private link"
   }
 }
 
@@ -64,6 +64,30 @@ variable "aks_subnet_prefix" {
   description = "Address prefix for the AKS subnet"
   type        = string
   default     = "10.0.1.0/24"
+}
+
+variable "storage_subnet_prefix" {
+  description = "Address prefix for the storage private endpoint subnet"
+  type        = string
+  default     = "10.0.2.0/24"
+}
+
+variable "registry_subnet_prefix" {
+  description = "Address prefix for the container registry private endpoint subnet"
+  type        = string
+  default     = "10.0.3.0/24"
+}
+
+variable "storage_account_tier" {
+  description = "Storage account tier"
+  type        = string
+  default     = "Standard"
+}
+
+variable "storage_replication_type" {
+  description = "Storage account replication type"
+  type        = string
+  default     = "LRS"
 }
 
 variable "tags" {

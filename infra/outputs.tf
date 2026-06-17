@@ -33,6 +33,26 @@ output "aks_subnet_id" {
   value       = module.networking.aks_subnet_id
 }
 
+output "storage_subnet_id" {
+  description = "Resource ID of the storage subnet"
+  value       = module.networking.storage_subnet_id
+}
+
+output "registry_subnet_id" {
+  description = "Resource ID of the registry subnet"
+  value       = module.networking.registry_subnet_id
+}
+
+output "storage_account_name" {
+  description = "Name of the storage account"
+  value       = module.storage.storage_account_name
+}
+
+output "storage_account_id" {
+  description = "Resource ID of the storage account"
+  value       = module.storage.storage_account_id
+}
+
 output "get_credentials_command" {
   description = "Command to retrieve AKS credentials for kubectl"
   value       = "az aks get-credentials --resource-group ${azurerm_resource_group.main.name} --name ${module.aks.cluster_name} --environment usgovernment"
