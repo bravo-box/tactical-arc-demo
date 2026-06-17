@@ -207,6 +207,30 @@
         "panel": "dedicated"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Azure: Create RG & Network",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/create-rg-network.sh"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Azure: Delete RG & Network",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/repo-scripts/delete-rg-network.sh"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
     }
   ]
 }
