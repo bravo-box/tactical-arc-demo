@@ -1,7 +1,7 @@
 data "azurerm_client_config" "current" {}
 
 # Container registry names must be globally unique, so derive a stable suffix
-# from the subscription and resource group name.
+# that only changes when the subscription or the name prefix changes.
 resource "random_string" "suffix" {
   length  = 6
   lower   = true

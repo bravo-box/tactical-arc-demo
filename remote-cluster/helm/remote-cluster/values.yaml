@@ -4,8 +4,9 @@ edgeAgent:
     repository: edge-agent
     tag: "0.1.0"
     pullPolicy: IfNotPresent
-  # URL of the cloud telemetry API reachable from the edge device.
-  telemetryUrl: http://telemetry-api:8080/telemetry
+  # Placeholder: must be overridden with the URL of the cloud telemetry API as
+  # reachable from the edge device (see scripts/deploy.sh --telemetry-url).
+  telemetryUrl: http://telemetry-api.example.invalid:8080/telemetry
   deviceId: ""
   intervalSeconds: 30
   resources:
