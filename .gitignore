@@ -4,7 +4,6 @@
 *.tfstate.*
 crash.log
 *.tfvars
-!*.tfvars.example
 
 # Packer
 packer_cache/

@@ -8,6 +8,11 @@ output "aks_cluster_name" {
   value       = azurerm_kubernetes_cluster.this.name
 }
 
+output "container_registry_name" {
+  description = "Globally unique name of the container registry."
+  value       = azurerm_container_registry.this.name
+}
+
 output "container_registry_login_server" {
   description = "Login server for the container registry used by both clusters."
   value       = azurerm_container_registry.this.login_server

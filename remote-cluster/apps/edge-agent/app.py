@@ -28,10 +28,7 @@ def build_reading() -> dict:
 
 
 def send_reading(reading: dict) -> None:
-    if not TELEMETRY_URL.startswith(("http://", "https://")):
-        raise ValueError("TELEMETRY_URL must be an http(s) URL")
-
-    request = urllib.request.Request(  # noqa: S310 - scheme validated above
+    request = urllib.request.Request(  # noqa: S310 - scheme validated in main()
         TELEMETRY_URL,
         data=json.dumps(reading).encode("utf-8"),
         headers={"Content-Type": "application/json"},
@@ -42,6 +39,9 @@ def send_reading(reading: dict) -> None:
 
 
 def main() -> None:
+    if not TELEMETRY_URL.startswith(("http://", "https://")):
+        raise SystemExit("TELEMETRY_URL must be an http(s) URL")
+
     print(f"edge-agent reporting {DEVICE_ID} to {TELEMETRY_URL}", flush=True)
     while True:
         try:

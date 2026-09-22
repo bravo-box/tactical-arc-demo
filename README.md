@@ -30,10 +30,14 @@ Build out an application showing remote management of a device at the edge using
 - **Packer** (installed from the HashiCorp apt repository in `post-create.sh`)
 - Docker-in-Docker for building the container images
 
+> The dev container mounts the host `~/.ssh` directory read-only, so create it on the
+> host (with your git key) before starting the container.
+
 Verify the tooling inside the container with:
 
 ```bash
-./scripts/verify-tools.sh
+./scripts/verify-tools.sh            # tool availability only
+./scripts/verify-tools.sh --check-ssh # also test SSH auth against github.com
 ```
 
 ## Linting

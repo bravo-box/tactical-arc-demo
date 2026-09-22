@@ -57,6 +57,12 @@ az aks get-credentials \
   --name "${CLUSTER_NAME}" \
   --overwrite-existing
 
+# The cluster uses Entra/Azure RBAC with local accounts disabled, so the
+# kubeconfig needs to be converted to the Azure CLI auth mode when available.
+if command -v kubelogin >/dev/null 2>&1; then
+  kubelogin convert-kubeconfig -l azurecli
+fi
+
 helm_args=(--namespace "${NAMESPACE}" --create-namespace --wait)
 if [ -n "${REGISTRY}" ]; then
   helm_args+=(--set "imageRegistry=${REGISTRY}")

@@ -1,3 +1,20 @@
+data "azurerm_client_config" "current" {}
+
+# Container registry names must be globally unique, so derive a stable suffix
+# from the subscription and resource group name.
+resource "random_string" "suffix" {
+  length  = 6
+  lower   = true
+  upper   = false
+  numeric = true
+  special = false
+
+  keepers = {
+    subscription = data.azurerm_client_config.current.subscription_id
+    name_prefix  = var.name_prefix
+  }
+}
+
 resource "azurerm_resource_group" "this" {
   name     = "rg-${var.name_prefix}"
   location = var.location
@@ -14,7 +31,7 @@ resource "azurerm_log_analytics_workspace" "this" {
 }
 
 resource "azurerm_container_registry" "this" {
-  name                = "cr${var.name_prefix}"
+  name                = "cr${var.name_prefix}${random_string.suffix.result}"
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   sku                 = "Standard"
@@ -51,6 +68,14 @@ resource "azurerm_kubernetes_cluster" "this" {
   oms_agent {
     log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
   }
+}
+
+# Azure RBAC is enabled and local accounts are disabled, so the deploying user
+# needs an explicit cluster admin assignment to run kubectl/helm.
+resource "azurerm_role_assignment" "aks_cluster_admin" {
+  scope                = azurerm_kubernetes_cluster.this.id
+  role_definition_name = "Azure Kubernetes Service RBAC Cluster Admin"
+  principal_id         = data.azurerm_client_config.current.object_id
 }
 
 resource "azurerm_role_assignment" "aks_acr_pull" {

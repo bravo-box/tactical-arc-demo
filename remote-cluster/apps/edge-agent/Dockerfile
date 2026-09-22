@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 WORKDIR /app
-COPY app.py ./
+COPY --chown=65532:65532 app.py ./
 
 ENV PYTHONUNBUFFERED=1
 

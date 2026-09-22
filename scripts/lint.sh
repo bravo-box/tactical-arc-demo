@@ -11,7 +11,7 @@ if command -v shellcheck >/dev/null 2>&1; then
   echo "== shellcheck =="
   # shellcheck disable=SC2312
   find . -path ./.git -prune -o -name '*.sh' -print0 |
-    xargs -0 shellcheck || status=1
+    xargs -0 -r shellcheck || status=1
 else
   echo "skip: shellcheck not installed"
 fi

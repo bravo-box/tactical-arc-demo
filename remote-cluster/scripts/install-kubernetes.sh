@@ -45,11 +45,24 @@ install_docker() {
     install -m 0755 -d /usr/share/keyrings
     # shellcheck disable=SC1091
     . /etc/os-release
-    curl -fsSL "https://download.docker.com/linux/${ID}/gpg" |
+    local distro="${ID:-}" codename="${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
+    case "${distro}" in
+    ubuntu | debian) ;;
+    *)
+      echo "Unsupported distribution '${distro}' for automatic Docker install." >&2
+      echo "Install Docker manually and re-run with --skip-docker." >&2
+      exit 1
+      ;;
+    esac
+    if [ -z "${codename}" ]; then
+      echo "Could not determine the distribution codename from /etc/os-release." >&2
+      exit 1
+    fi
+    curl -fsSL "https://download.docker.com/linux/${distro}/gpg" |
       gpg --batch --yes --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
     chmod a+r /usr/share/keyrings/docker-archive-keyring.gpg
     printf 'deb [arch=%s signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/%s %s stable\n' \
-      "$(dpkg --print-architecture)" "${ID}" "${VERSION_CODENAME}" \
+      "$(dpkg --print-architecture)" "${distro}" "${codename}" \
       >/etc/apt/sources.list.d/docker.list
     apt-get update
     apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin
@@ -98,8 +111,11 @@ configure_kubeconfig() {
   home_dir="$(getent passwd "${target_user}" | cut -d: -f6)"
   local kube_dir="${home_dir}/.kube"
 
-  install -d -m 0700 -o "${target_user}" "${kube_dir}"
-  install -m 0600 -o "${target_user}" /etc/rancher/k3s/k3s.yaml "${kube_dir}/config"
+  local target_group
+  target_group="$(id -gn "${target_user}")"
+
+  install -d -m 0700 -o "${target_user}" -g "${target_group}" "${kube_dir}"
+  install -m 0600 -o "${target_user}" -g "${target_group}" /etc/rancher/k3s/k3s.yaml "${kube_dir}/config"
   echo "Wrote kubeconfig to ${kube_dir}/config"
 }
 

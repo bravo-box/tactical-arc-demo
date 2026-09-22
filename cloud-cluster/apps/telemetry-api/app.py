@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -15,6 +16,7 @@ MAX_BODY_BYTES = int(os.environ.get("MAX_BODY_BYTES", str(64 * 1024)))
 PORT = int(os.environ.get("PORT", "8080"))
 
 READINGS: deque[dict] = deque(maxlen=MAX_READINGS)
+READINGS_LOCK = threading.Lock()
 
 
 class TelemetryHandler(BaseHTTPRequestHandler):
@@ -32,7 +34,9 @@ class TelemetryHandler(BaseHTTPRequestHandler):
         if self.path in ("/healthz", "/readyz"):
             self._respond(200, {"status": "ok"})
         elif self.path == "/telemetry":
-            self._respond(200, {"count": len(READINGS), "readings": list(READINGS)})
+            with READINGS_LOCK:
+                readings = list(READINGS)
+            self._respond(200, {"count": len(readings), "readings": readings})
         else:
             self._respond(404, {"error": "not found"})
 
@@ -42,8 +46,11 @@ class TelemetryHandler(BaseHTTPRequestHandler):
             return
 
         length = int(self.headers.get("Content-Length") or 0)
-        if length <= 0 or length > MAX_BODY_BYTES:
-            self._respond(413, {"error": "invalid content length"})
+        if length <= 0:
+            self._respond(400, {"error": "missing or invalid Content-Length"})
+            return
+        if length > MAX_BODY_BYTES:
+            self._respond(413, {"error": f"payload too large, max {MAX_BODY_BYTES} bytes"})
             return
 
         try:
@@ -56,8 +63,10 @@ class TelemetryHandler(BaseHTTPRequestHandler):
             self._respond(400, {"error": "expected a json object"})
             return
 
-        READINGS.append(reading)
-        self._respond(202, {"accepted": True, "count": len(READINGS)})
+        with READINGS_LOCK:
+            READINGS.append(reading)
+            count = len(READINGS)
+        self._respond(202, {"accepted": True, "count": count})
 
     def log_message(self, fmt: str, *args) -> None:
         print(f"{self.address_string()} - {fmt % args}", flush=True)
