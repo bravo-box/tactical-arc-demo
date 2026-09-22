@@ -1,7 +1,5 @@
 data "azurerm_client_config" "current" {}
 
-# Container registry names must be globally unique, so derive a stable suffix
-# that only changes when the subscription or the name prefix changes.
 resource "random_string" "suffix" {
   length  = 6
   lower   = true
@@ -15,72 +13,88 @@ resource "random_string" "suffix" {
   }
 }
 
-resource "azurerm_resource_group" "this" {
-  name     = "rg-${var.name_prefix}"
-  location = var.location
-  tags     = var.tags
+locals {
+  tags = merge(var.tags, {
+    environment = var.environment
+    workload    = "tactical-arc-demo"
+    managed-by  = "terraform"
+  })
 }
 
-resource "azurerm_log_analytics_workspace" "this" {
-  name                = "log-${var.name_prefix}"
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  sku                 = "PerGB2018"
-  retention_in_days   = 30
-  tags                = var.tags
+module "networking" {
+  source = "./modules/networking"
+
+  location                                  = var.location
+  resource_group_name                       = "az-tactical-demo-network"
+  name_prefix                               = var.name_prefix
+  vnet_address_space                        = var.vnet_address_space
+  aks_subnet_prefix                         = var.aks_subnet_prefix
+  application_gateway_prefix                = var.application_gateway_subnet_prefix
+  private_endpoint_prefix                   = var.private_endpoint_subnet_prefix
+  gateway_subnet_prefix                     = var.gateway_subnet_prefix
+  bastion_subnet_prefix                     = var.bastion_subnet_prefix
+  vpn_client_address_space                  = var.vpn_client_address_space
+  tenant_id                                 = data.azurerm_client_config.current.tenant_id
+  vpn_gateway_sku                           = var.vpn_gateway_sku
+  application_gateway_key_vault_id          = var.application_gateway_key_vault_id
+  application_gateway_certificate_secret_id = var.application_gateway_certificate_secret_id
+  edge_vpn_enabled                          = var.edge_vpn_enabled
+  edge_gateway_address                      = var.edge_gateway_address
+  edge_address_spaces                       = var.edge_address_spaces
+  edge_shared_key                           = var.edge_shared_key
+  tags                                      = local.tags
 }
 
-resource "azurerm_container_registry" "this" {
-  name                = "cr${var.name_prefix}${random_string.suffix.result}"
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  sku                 = "Standard"
-  admin_enabled       = false
-  tags                = var.tags
+module "cloud" {
+  source = "./modules/cloud"
+
+  location                          = var.location
+  resource_group_name               = "az-tactical-demo-cloud"
+  name_prefix                       = var.name_prefix
+  unique_suffix                     = random_string.suffix.result
+  kubernetes_version                = var.kubernetes_version
+  node_count                        = var.node_count
+  node_vm_size                      = var.node_vm_size
+  aks_subnet_id                     = module.networking.aks_subnet_id
+  application_gateway_id            = module.networking.application_gateway_id
+  application_gateway_subnet_id     = module.networking.application_gateway_subnet_id
+  cluster_admin_principal_id        = data.azurerm_client_config.current.object_id
+  service_cidr                      = var.aks_service_cidr
+  dns_service_ip                    = var.aks_dns_service_ip
+  workload_identity_namespace       = var.workload_identity_namespace
+  workload_identity_service_account = var.workload_identity_service_account
+  tags                              = local.tags
 }
 
-# Cloud cluster that hosts the workloads in /cloud-cluster.
-resource "azurerm_kubernetes_cluster" "this" {
-  name                = "aks-${var.name_prefix}"
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  dns_prefix          = var.name_prefix
-  kubernetes_version  = var.kubernetes_version
-  tags                = var.tags
+module "messaging" {
+  source = "./modules/messaging"
 
-  default_node_pool {
-    name       = "system"
-    node_count = var.node_count
-    vm_size    = var.node_vm_size
-  }
-
-  identity {
-    type = "SystemAssigned"
-  }
-
-  local_account_disabled = true
-
-  azure_active_directory_role_based_access_control {
-    managed            = true
-    azure_rbac_enabled = true
-  }
-
-  oms_agent {
-    log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
-  }
+  location                    = var.location
+  resource_group_name         = module.cloud.resource_group_name
+  name_prefix                 = var.name_prefix
+  unique_suffix               = random_string.suffix.result
+  workload_identity_principal = module.cloud.workload_identity_principal_id
+  edge_arc_principal_id       = var.edge_arc_principal_id
+  log_analytics_workspace_id  = module.cloud.log_analytics_workspace_id
+  tags                        = local.tags
 }
 
-# Azure RBAC is enabled and local accounts are disabled, so the deploying user
-# needs an explicit cluster admin assignment to run kubectl/helm.
-resource "azurerm_role_assignment" "aks_cluster_admin" {
-  scope                = azurerm_kubernetes_cluster.this.id
-  role_definition_name = "Azure Kubernetes Service RBAC Cluster Admin"
-  principal_id         = data.azurerm_client_config.current.object_id
+module "private_link" {
+  source = "./modules/private-link"
+
+  location                   = var.location
+  resource_group_name        = module.networking.resource_group_name
+  vnet_id                    = module.networking.vnet_id
+  private_endpoint_subnet_id = module.networking.private_endpoint_subnet_id
+  container_registry_id      = module.cloud.container_registry_id
+  servicebus_namespace_id    = module.messaging.servicebus_namespace_id
+  tags                       = local.tags
 }
 
-resource "azurerm_role_assignment" "aks_acr_pull" {
-  scope                            = azurerm_container_registry.this.id
-  role_definition_name             = "AcrPull"
-  principal_id                     = azurerm_kubernetes_cluster.this.kubelet_identity[0].object_id
-  skip_service_principal_aad_check = true
+module "edge" {
+  source = "./modules/edge"
+
+  location            = var.location
+  resource_group_name = "az-tactical-demo-edge"
+  tags                = local.tags
 }

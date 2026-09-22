@@ -1,24 +1,59 @@
-output "resource_group_name" {
-  description = "Name of the resource group holding the demo resources."
-  value       = azurerm_resource_group.this.name
+output "network_resource_group_name" {
+  description = "Resource group containing shared network resources."
+  value       = module.networking.resource_group_name
+}
+
+output "cloud_resource_group_name" {
+  description = "Resource group containing AKS and cloud services."
+  value       = module.cloud.resource_group_name
+}
+
+output "edge_resource_group_name" {
+  description = "Resource group reserved for Arc-managed edge resources."
+  value       = module.edge.resource_group_name
 }
 
 output "aks_cluster_name" {
-  description = "Name of the cloud AKS cluster."
-  value       = azurerm_kubernetes_cluster.this.name
+  description = "Cloud AKS cluster name."
+  value       = module.cloud.aks_cluster_name
 }
 
 output "container_registry_name" {
-  description = "Globally unique name of the container registry."
-  value       = azurerm_container_registry.this.name
+  description = "Globally unique Azure Container Registry name."
+  value       = module.cloud.container_registry_name
 }
 
 output "container_registry_login_server" {
-  description = "Login server for the container registry used by both clusters."
-  value       = azurerm_container_registry.this.login_server
+  description = "Azure Government registry login server."
+  value       = module.cloud.container_registry_login_server
+}
+
+output "application_gateway_public_ip" {
+  description = "Public IP through which application traffic enters the platform."
+  value       = module.networking.application_gateway_public_ip
+}
+
+output "vpn_gateway_public_ip" {
+  description = "Public IP of the VPN Gateway."
+  value       = module.networking.vpn_gateway_public_ip
+}
+
+output "servicebus_namespace_name" {
+  description = "Service Bus namespace used by cloud and edge applications."
+  value       = module.messaging.servicebus_namespace_name
+}
+
+output "servicebus_fully_qualified_namespace" {
+  description = "Azure Government Service Bus namespace endpoint."
+  value       = module.messaging.servicebus_fully_qualified_namespace
+}
+
+output "workload_identity_client_id" {
+  description = "Client ID to annotate on the telemetry Kubernetes service account."
+  value       = module.cloud.workload_identity_client_id
 }
 
 output "log_analytics_workspace_id" {
-  description = "Log Analytics workspace used for cluster and edge telemetry."
-  value       = azurerm_log_analytics_workspace.this.id
+  description = "Log Analytics workspace receiving AKS and platform diagnostics."
+  value       = module.cloud.log_analytics_workspace_id
 }
