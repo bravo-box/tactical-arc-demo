@@ -39,8 +39,20 @@ install_docker() {
   if command -v docker >/dev/null 2>&1; then
     echo "Docker already installed: $(docker --version)"
   else
-    echo "Installing Docker Engine..."
-    curl -fsSL https://get.docker.com | sh
+    echo "Installing Docker Engine from the signed Docker apt repository..."
+    apt-get update
+    apt-get install -y --no-install-recommends ca-certificates curl gnupg
+    install -m 0755 -d /usr/share/keyrings
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    curl -fsSL "https://download.docker.com/linux/${ID}/gpg" |
+      gpg --batch --yes --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    chmod a+r /usr/share/keyrings/docker-archive-keyring.gpg
+    printf 'deb [arch=%s signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/%s %s stable\n' \
+      "$(dpkg --print-architecture)" "${ID}" "${VERSION_CODENAME}" \
+      >/etc/apt/sources.list.d/docker.list
+    apt-get update
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin
   fi
 
   # Configure the daemon for edge use: bounded log files and live restore so

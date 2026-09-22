@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 for app_dir in "${APPS_DIR}"/*/; do
-  [ -f "${app_dir}/Dockerfile" ] || continue
+  [ -f "${app_dir}Dockerfile" ] || continue
   app="$(basename "${app_dir}")"
   image="${app}:${TAG}"
   if [ -n "${REGISTRY}" ]; then

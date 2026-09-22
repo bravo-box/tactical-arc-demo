@@ -4,8 +4,8 @@ variable "azure_environment" {
   default     = "usgovernment"
 
   validation {
-    condition     = contains(["public", "usgovernment", "china", "german"], var.azure_environment)
-    error_message = "azure_environment must be one of: public, usgovernment, china, german."
+    condition     = contains(["public", "usgovernment", "china"], var.azure_environment)
+    error_message = "azure_environment must be one of: public, usgovernment, china."
   }
 }
 

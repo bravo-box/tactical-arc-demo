@@ -5,7 +5,6 @@
 crash.log
 *.tfvars
 !*.tfvars.example
-.terraform.lock.hcl
 
 # Packer
 packer_cache/

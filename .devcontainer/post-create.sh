@@ -46,9 +46,20 @@ configure_ssh() {
     chmod 600 "${ssh_dir}/known_hosts"
   fi
 
-  # Load available private keys into the forwarded/local agent.
+  # Load available private keys into the forwarded agent. When VS Code does not
+  # forward the host agent, start one and persist its socket for future shells.
   if [ -z "${SSH_AUTH_SOCK:-}" ]; then
-    eval "$(ssh-agent -s)" >/dev/null
+    local agent_env="${HOME}/.ssh/agent.env"
+    ssh-agent -s >"${agent_env}"
+    chmod 600 "${agent_env}"
+    # shellcheck source=/dev/null
+    . "${agent_env}" >/dev/null
+    # shellcheck disable=SC2016 # the snippet must expand in the future shell
+    local snippet='[ -f "${HOME}/.ssh/agent.env" ] && [ -z "${SSH_AUTH_SOCK:-}" ] && . "${HOME}/.ssh/agent.env" >/dev/null'
+    for profile in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
+      [ -f "${profile}" ] || continue
+      grep -qF 'ssh/agent.env' "${profile}" || echo "${snippet}" >>"${profile}"
+    done
   fi
   for key in "${ssh_dir}"/id_*; do
     [ -f "${key}" ] || continue
