@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "remote-cluster.fullname" . }}-edge-agent
+  labels:
+    {{- include "remote-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/component: edge-agent
+spec:
+  replicas: {{ .Values.edgeAgent.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "remote-cluster.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: edge-agent
+  template:
+    metadata:
+      labels:
+        {{- include "remote-cluster.labels" . | nindent 8 }}
+        app.kubernetes.io/component: edge-agent
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+        - name: edge-agent
+          image: {{ include "remote-cluster.image" . }}
+          imagePullPolicy: {{ .Values.edgeAgent.image.pullPolicy }}
+          env:
+            - name: TELEMETRY_URL
+              value: {{ .Values.edgeAgent.telemetryUrl | quote }}
+            - name: INTERVAL_SECONDS
+              value: {{ .Values.edgeAgent.intervalSeconds | quote }}
+            {{- if .Values.edgeAgent.deviceId }}
+            - name: DEVICE_ID
+              value: {{ .Values.edgeAgent.deviceId | quote }}
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.edgeAgent.resources | nindent 12 }}

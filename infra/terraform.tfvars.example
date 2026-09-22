@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars and adjust for your environment.
+azure_environment = "usgovernment"
+# subscription_id = "00000000-0000-0000-0000-000000000000"
+name_prefix = "tacticalarc"
+location    = "usgovvirginia"
+node_count  = 2
