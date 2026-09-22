@@ -71,6 +71,10 @@ install_docker() {
   # Configure the daemon for edge use: bounded log files and live restore so
   # containers keep running across daemon restarts on unreliable links.
   install -d -m 0755 /etc/docker
+  if [ -f /etc/docker/daemon.json ]; then
+    cp -a /etc/docker/daemon.json "/etc/docker/daemon.json.bak.$(date +%Y%m%d%H%M%S)"
+    echo "Backed up the existing /etc/docker/daemon.json before overwriting it."
+  fi
   cat >/etc/docker/daemon.json <<'JSON'
 {
   "log-driver": "json-file",
@@ -109,6 +113,10 @@ configure_kubeconfig() {
   local target_user="${SUDO_USER:-root}"
   local home_dir
   home_dir="$(getent passwd "${target_user}" | cut -d: -f6)"
+  if [ -z "${home_dir}" ] || [ ! -d "${home_dir}" ]; then
+    echo "Could not determine the home directory for '${target_user}'." >&2
+    exit 1
+  fi
   local kube_dir="${home_dir}/.kube"
 
   local target_group

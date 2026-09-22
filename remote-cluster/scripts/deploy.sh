@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deploy the edge Helm chart onto the edge Kubernetes cluster.
 #
-# Usage: deploy.sh [--telemetry-url <url>] [--registry <acr>] [--release <name>] [--namespace <ns>]
+# Usage: deploy.sh --telemetry-url <url> [--registry <acr>] [--release <name>] [--namespace <ns>]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,6 +40,11 @@ while [[ $# -gt 0 ]]; do
     ;;
   esac
 done
+
+if [ -z "${TELEMETRY_URL}" ]; then
+  echo "--telemetry-url is required (the chart default is a placeholder)" >&2
+  exit 1
+fi
 
 helm_args=(--namespace "${NAMESPACE}" --create-namespace --wait)
 if [ -n "${REGISTRY}" ]; then
