@@ -1,10 +1,10 @@
 terraform {
-  required_version = ">= 1.5.0"
+  required_version = ">= 1.6.0"
 
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.100"
+      version = "~> 4.0"
     }
     random = {
       source  = "hashicorp/random"
@@ -13,8 +13,6 @@ terraform {
   }
 }
 
-# Authentication is performed with the Azure CLI user credentials
-# (`az cloud set --name AzureUSGovernment && az login`).
 provider "azurerm" {
   features {}
 

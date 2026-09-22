@@ -1,6 +1,25 @@
-# Copy to terraform.tfvars and adjust for your environment.
 azure_environment = "usgovernment"
-# subscription_id = "00000000-0000-0000-0000-000000000000"
-name_prefix = "tacticalarc"
-location    = "usgovvirginia"
-node_count  = 2
+subscription_id   = "00000000-0000-0000-0000-000000000000"
+location          = "usgovvirginia"
+name_prefix       = "tacticalarc"
+environment       = "demo"
+
+# Use a versionless Key Vault certificate secret ID so Application Gateway can
+# automatically pick up renewed certificate versions.
+application_gateway_key_vault_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/<key-vault-rg>/providers/Microsoft.KeyVault/vaults/<vault-name>"
+application_gateway_certificate_secret_id = "https://<vault-name>.vault.usgovcloudapi.net/secrets/<certificate-name>/"
+
+# Optional site-to-site edge VPN. Supply edge_shared_key through
+# TF_VAR_edge_shared_key rather than committing it to this file.
+edge_vpn_enabled     = false
+edge_gateway_address = null
+edge_address_spaces  = []
+
+# After Arc onboarding, set this to the edge device managed identity principal
+# ID to grant it Azure Service Bus Data Sender.
+edge_arc_principal_id = null
+
+tags = {
+  project = "tactical-arc-demo"
+  owner   = "platform-team"
+}
