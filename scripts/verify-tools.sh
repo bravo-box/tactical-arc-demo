@@ -14,7 +14,8 @@ for tool in "${REQUIRED_TOOLS[@]}"; do
   fi
 done
 
-if ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+ssh_output="$(ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 || true)"
+if echo "${ssh_output}" | grep -q "successfully authenticated"; then
   echo "ok      ssh git authentication to github.com"
 else
   echo "warn    ssh git authentication to github.com not available"
