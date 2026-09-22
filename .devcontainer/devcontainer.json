@@ -1,0 +1,46 @@
+{
+  "name": "tactical-arc-demo",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": false,
+      "upgradePackages": true
+    },
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/azure-cli:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "version": "latest",
+      "helm": "latest",
+      "minikube": "none"
+    },
+    "ghcr.io/devcontainers/features/terraform:1": {
+      "version": "latest",
+      "tflint": "latest"
+    }
+  },
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh-localhost,type=bind,consistency=cached,readonly"
+  ],
+  "containerEnv": {
+    "AZURE_CLOUD": "AzureUSGovernment"
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "remoteUser": "vscode",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "hashicorp.terraform",
+        "ms-azuretools.vscode-azureterraform",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "ms-vscode.azurecli",
+        "ms-azuretools.vscode-docker",
+        "timonwong.shellcheck",
+        "redhat.vscode-yaml"
+      ]
+    }
+  }
+}

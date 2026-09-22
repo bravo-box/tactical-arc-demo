@@ -1,0 +1,21 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+
+# Packer
+packer_cache/
+*.auto.pkrvars.hcl
+
+# Helm
+charts/*.tgz
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Local tooling
+.kube/
+.vscode/
