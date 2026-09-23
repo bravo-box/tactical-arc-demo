@@ -18,6 +18,7 @@ from azure.identity import DefaultAzureCredential
 from azure.servicebus import ServiceBusClient, ServiceBusMessage
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from device_info_client import DeviceInfoClient
+from location_client import LocationClient
 
 CONFIG_PATH = Path(os.environ.get("IMAGE_UPLOADER_CONFIG", "/etc/image-uploader/config.json"))
 STORAGE_CONNECTION_STRING = "STORAGE_CONNECTION_STRING"
@@ -84,6 +85,13 @@ def load_config(path: Path) -> dict[str, Any]:
         or device_info_timeout <= 0
     ):
         raise ValueError("deviceInfoTimeoutSeconds must be a positive number")
+    location_timeout = value.get("locationTimeoutSeconds", 5)
+    if (
+        not isinstance(location_timeout, (int, float))
+        or isinstance(location_timeout, bool)
+        or location_timeout <= 0
+    ):
+        raise ValueError("locationTimeoutSeconds must be a positive number")
     return {
         "mqttHost": os.environ.get("MQTT_HOST", value["mqttHost"]),
         "mqttPort": int(value.get("mqttPort", 1883)),
@@ -98,6 +106,7 @@ def load_config(path: Path) -> dict[str, Any]:
         "connectivityHost": value.get("connectivityHost", "1.1.1.1"),
         "connectivityPort": int(value.get("connectivityPort", 443)),
         "deviceInfoTimeoutSeconds": float(device_info_timeout),
+        "locationTimeoutSeconds": float(location_timeout),
     }
 
 
@@ -124,12 +133,14 @@ class ImageUploader:
         blob_service: BlobServiceClient,
         service_bus: ServiceBusClient,
         device_info_client: DeviceInfoClient,
+        location_client: LocationClient,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.config = config
         self.blob_service = blob_service
         self.service_bus = service_bus
         self.device_info_client = device_info_client
+        self.location_client = location_client
         self.clock = clock
         self.breaker = ConnectivityCircuitBreaker()
         self.pending: queue.Queue[Path] = queue.Queue()
@@ -150,6 +161,7 @@ class ImageUploader:
     def upload(self, manifest: Path) -> None:
         metadata = json.loads(manifest.read_text(encoding="utf-8"))
         metadata["deviceInfo"] = self.device_info_client.request()
+        metadata["location"] = self.location_client.request()
         image_path = Path(metadata["localPath"])
         blob_name = f"{metadata['deviceId']}/{metadata['capturedAt'][:10]}/{metadata['fileName']}"
         container = self.blob_service.get_container_client(self.config["storageContainer"])
@@ -174,6 +186,8 @@ class ImageUploader:
                         separators=(",", ":"),
                         ensure_ascii=True,
                     ),
+                    "latitude": str(metadata["location"]["latitude"]),
+                    "longitude": str(metadata["location"]["longitude"]),
                 },
             )
         uploaded = {
@@ -274,7 +288,19 @@ def main() -> None:
         config["deviceInfoTimeoutSeconds"],
         client_id="image-uploader-device-info",
     )
-    uploader = ImageUploader(config, blob_service, service_bus, device_info_client)
+    location_client = LocationClient(
+        config["mqttHost"],
+        config["mqttPort"],
+        config["locationTimeoutSeconds"],
+        client_id="image-uploader-location",
+    )
+    uploader = ImageUploader(
+        config,
+        blob_service,
+        service_bus,
+        device_info_client,
+        location_client,
+    )
     stop = threading.Event()
 
     def on_message(client: mqtt.Client, userdata: Any, message: mqtt.MQTTMessage) -> None:
@@ -299,6 +325,7 @@ def main() -> None:
         subscriber.disconnect()
         subscriber.loop_stop()
         device_info_client.close()
+        location_client.close()
 
 
 if __name__ == "__main__":

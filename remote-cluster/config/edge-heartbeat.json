@@ -4,5 +4,6 @@
   "heartbeatIntervalSeconds": 5,
   "serviceBusTopic": "edge-heartbeat",
   "mqttPort": 1883,
-  "deviceInfoTimeoutSeconds": 5
+  "deviceInfoTimeoutSeconds": 5,
+  "locationTimeoutSeconds": 5
 }

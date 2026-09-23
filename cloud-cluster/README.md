@@ -5,6 +5,8 @@ The C# heartbeat monitor consumes the `heartbeat-monitor` subscription on the
 `edge-heartbeat` topic and displays active devices and their heartbeat history.
 Its optional image feature also consumes `image-upload`, reads private blobs,
 and displays image tiles and a full-size metadata modal on the selected device.
+The device view also displays heartbeat coordinates and can queue validated
+location updates for the selected edge device.
 Device state is persisted in a single Cosmos DB JSON document per device.
 
 - `apps/` – containerized application source code and Dockerfiles.
@@ -21,6 +23,12 @@ connection string, or set `fullyQualifiedNamespace` and `workloadIdentity.client
 for AKS workload identity. Cosmos DB always uses workload identity: set
 `telemetryApi.cosmos.endpoint` to the Terraform `cosmosdb_endpoint` output.
 
+Location updates use the session-aware `update-location` queue. Configure
+`telemetryApi.locationCommands.fullyQualifiedNamespace` for workload identity,
+or set `telemetryApi.locationCommands.existingSecret` to a secret containing a
+sender connection string. Set `telemetryApi.locationCommands.enabled=false` to
+hide and disable the update UI and endpoint.
+
 Enable images with:
 
 ```bash
@@ -29,6 +37,7 @@ helm upgrade --install cloud-cluster ./cloud-cluster/helm/cloud-cluster \
   --set telemetryApi.imageServiceBus.enabled=true \
   --set telemetryApi.imageServiceBus.fullyQualifiedNamespace="<namespace>.servicebus.usgovcloudapi.net" \
   --set telemetryApi.cameraCommands.fullyQualifiedNamespace="<namespace>.servicebus.usgovcloudapi.net" \
+  --set telemetryApi.locationCommands.fullyQualifiedNamespace="<namespace>.servicebus.usgovcloudapi.net" \
   --set telemetryApi.storage.accountUrl="https://<account>.blob.core.usgovcloudapi.net" \
   --set telemetryApi.cosmos.endpoint="<terraform cosmosdb_endpoint>" \
   --set telemetryApi.workloadIdentity.clientId="<terraform workload_identity_client_id>"

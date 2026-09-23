@@ -15,6 +15,11 @@ class FakeDeviceInfoClient:
         return {"deviceId": "edge-01", "model": "Jetson Nano"}
 
 
+class FakeLocationClient:
+    def request(self) -> dict[str, float]:
+        return {"latitude": 47.61, "longitude": -122.33}
+
+
 class FakeContainer:
     url = "https://example.test/device-images"
 
@@ -121,6 +126,7 @@ class ImageUploaderTests(unittest.TestCase):
                 blob_service,
                 service_bus,
                 FakeDeviceInfoClient(),
+                FakeLocationClient(),
             )
 
             uploader.upload(manifest)
@@ -133,6 +139,12 @@ class ImageUploaderTests(unittest.TestCase):
                 json.loads(str(service_bus.sender.message))["deviceInfo"],
                 {"deviceId": "edge-01", "model": "Jetson Nano"},
             )
+            self.assertEqual(
+                json.loads(str(service_bus.sender.message))["location"],
+                {"latitude": 47.61, "longitude": -122.33},
+            )
+            self.assertEqual(blob_service.container.metadata["latitude"], "47.61")
+            self.assertEqual(blob_service.container.metadata["longitude"], "-122.33")
             self.assertFalse(image.exists())
             self.assertFalse(manifest.exists())
 

@@ -38,6 +38,8 @@ jobs:
             context: remote-cluster/apps/edge-heartbeat
           - image: device-service
             context: remote-cluster/apps/device-service
+          - image: location-service
+            context: remote-cluster/apps/location-service
           - image: camera-capture
             context: remote-cluster/apps/camera-capture
           - image: image-uploader

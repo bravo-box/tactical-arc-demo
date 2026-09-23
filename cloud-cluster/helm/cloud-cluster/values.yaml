@@ -25,6 +25,12 @@ telemetryApi:
     fullyQualifiedNamespace: ""
     existingSecret: ""
     connectionStringKey: connection-string
+  locationCommands:
+    enabled: true
+    queue: update-location
+    fullyQualifiedNamespace: ""
+    existingSecret: ""
+    connectionStringKey: connection-string
   storage:
     container: device-images
     accountUrl: ""

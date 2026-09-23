@@ -13,6 +13,7 @@ from typing import Any
 from azure.servicebus import ServiceBusClient, ServiceBusMessage
 from azure.servicebus.exceptions import ServiceBusError
 from device_info_client import DeviceInfoClient
+from location_client import LocationClient
 
 CONFIG_PATH = Path(os.environ.get("EDGE_HEARTBEAT_CONFIG", "/etc/edge-heartbeat/config.json"))
 CONNECTION_STRING_ENV = "SERVICEBUS_CONNECTION_STRING"
@@ -52,6 +53,13 @@ def load_config(path: Path) -> dict[str, Any]:
         or device_info_timeout <= 0
     ):
         raise ValueError("deviceInfoTimeoutSeconds must be a positive number")
+    location_timeout = config.get("locationTimeoutSeconds", 5)
+    if (
+        not isinstance(location_timeout, (int, float))
+        or isinstance(location_timeout, bool)
+        or location_timeout <= 0
+    ):
+        raise ValueError("locationTimeoutSeconds must be a positive number")
 
     return {
         "device-name": device_name.strip(),
@@ -61,6 +69,7 @@ def load_config(path: Path) -> dict[str, Any]:
         "mqttHost": mqtt_host.strip(),
         "mqttPort": int(config.get("mqttPort", 1883)),
         "deviceInfoTimeoutSeconds": float(device_info_timeout),
+        "locationTimeoutSeconds": float(location_timeout),
     }
 
 
@@ -80,6 +89,7 @@ def build_heartbeat(
     device_name: str,
     health_status: str,
     device_info: dict[str, Any],
+    location: dict[str, float],
 ) -> dict[str, Any]:
     return {
         "id": str(uuid.uuid4()),
@@ -89,6 +99,7 @@ def build_heartbeat(
         "healthStatus": health_status,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "deviceInfo": device_info,
+        "location": location,
     }
 
 
@@ -125,6 +136,12 @@ def main() -> None:
         config["deviceInfoTimeoutSeconds"],
         client_id=f"edge-heartbeat-{device_name}",
     )
+    location_client = LocationClient(
+        config["mqttHost"],
+        config["mqttPort"],
+        config["locationTimeoutSeconds"],
+        client_id=f"edge-heartbeat-location-{device_name}",
+    )
     print(
         f"edge-heartbeat device={device_name} topic={topic} interval={interval:g}s",
         flush=True,
@@ -135,7 +152,10 @@ def main() -> None:
             while True:
                 try:
                     device_info = device_info_client.request()
-                    heartbeat = build_heartbeat(device_name, health_status, device_info)
+                    location = location_client.request()
+                    heartbeat = build_heartbeat(
+                        device_name, health_status, device_info, location
+                    )
                     message = ServiceBusMessage(
                         json.dumps(heartbeat, separators=(",", ":")),
                         content_type="application/json",
@@ -158,6 +178,7 @@ def main() -> None:
                 time.sleep(interval)
     finally:
         device_info_client.close()
+        location_client.close()
 
 
 if __name__ == "__main__":

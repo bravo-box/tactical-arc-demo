@@ -57,6 +57,12 @@ spec:
               value: {{ .Values.telemetryApi.cameraCommands.queue | quote }}
             - name: CameraCommands__FullyQualifiedNamespace
               value: {{ .Values.telemetryApi.cameraCommands.fullyQualifiedNamespace | quote }}
+            - name: LocationCommands__Enabled
+              value: {{ .Values.telemetryApi.locationCommands.enabled | quote }}
+            - name: LocationCommands__Queue
+              value: {{ .Values.telemetryApi.locationCommands.queue | quote }}
+            - name: LocationCommands__FullyQualifiedNamespace
+              value: {{ .Values.telemetryApi.locationCommands.fullyQualifiedNamespace | quote }}
             - name: Storage__Container
               value: {{ .Values.telemetryApi.storage.container | quote }}
             - name: Storage__AccountUrl
@@ -100,6 +106,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.telemetryApi.cameraCommands.existingSecret }}
                   key: {{ .Values.telemetryApi.cameraCommands.connectionStringKey }}
+            {{- end }}
+            {{- if .Values.telemetryApi.locationCommands.existingSecret }}
+            - name: LocationCommands__ConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetryApi.locationCommands.existingSecret }}
+                  key: {{ .Values.telemetryApi.locationCommands.connectionStringKey }}
             {{- end }}
           livenessProbe:
             httpGet:

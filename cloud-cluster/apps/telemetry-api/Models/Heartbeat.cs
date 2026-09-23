@@ -27,8 +27,6 @@ public sealed record Heartbeat
     public Dictionary<string, JsonElement> DeviceInfo { get; init; } = [];
 }
 
-public sealed record DeviceLocation(double Latitude, double Longitude);
-
 public sealed record DeviceSpec(string Name, string Value);
 
 public sealed record ReceivedHeartbeat(

@@ -55,6 +55,18 @@ resource "azurerm_servicebus_queue" "take_picture" {
   default_message_ttl                     = "P1D"
 }
 
+resource "azurerm_servicebus_queue" "update_location" {
+  name                                    = "update-location"
+  namespace_id                            = azurerm_servicebus_namespace.this.id
+  lock_duration                           = "PT1M"
+  max_delivery_count                      = 10
+  dead_lettering_on_message_expiration    = true
+  duplicate_detection_history_time_window = "PT10M"
+  requires_duplicate_detection            = true
+  requires_session                        = true
+  default_message_ttl                     = "P1D"
+}
+
 resource "azurerm_servicebus_topic" "image_upload" {
   name                                    = "image-upload"
   namespace_id                            = azurerm_servicebus_namespace.this.id
@@ -100,6 +112,20 @@ resource "azurerm_role_assignment" "edge_camera_receiver" {
 
 resource "azurerm_role_assignment" "cloud_camera_sender" {
   scope                = azurerm_servicebus_queue.take_picture.id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = var.workload_identity_principal
+}
+
+resource "azurerm_role_assignment" "edge_location_receiver" {
+  count = var.edge_arc_principal_id == null ? 0 : 1
+
+  scope                = azurerm_servicebus_queue.update_location.id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = var.edge_arc_principal_id
+}
+
+resource "azurerm_role_assignment" "cloud_location_sender" {
+  scope                = azurerm_servicebus_queue.update_location.id
   role_definition_name = "Azure Service Bus Data Sender"
   principal_id         = var.workload_identity_principal
 }

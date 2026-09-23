@@ -76,6 +76,7 @@ class EdgeHeartbeatTests(unittest.TestCase):
             "edge-01",
             "Green",
             {"model": "Jetson Nano"},
+            {"latitude": 47.61, "longitude": -122.33},
         )
 
         self.assertEqual(heartbeat["type"], "edge-heartbeat")
@@ -85,6 +86,10 @@ class EdgeHeartbeatTests(unittest.TestCase):
         self.assertTrue(heartbeat["id"])
         self.assertTrue(heartbeat["timestamp"])
         self.assertEqual(heartbeat["deviceInfo"]["model"], "Jetson Nano")
+        self.assertEqual(
+            heartbeat["location"],
+            {"latitude": 47.61, "longitude": -122.33},
+        )
 
     def test_namespace_connection_string_removes_entity_path(self) -> None:
         connection_string = (

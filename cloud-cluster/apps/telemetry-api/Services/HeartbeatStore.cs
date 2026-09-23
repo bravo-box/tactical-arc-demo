@@ -153,7 +153,11 @@ public sealed class HeartbeatStore
             return null;
         }
 
-        return new DeviceLocation(latitudeValue, longitudeValue);
+        return new DeviceLocation
+        {
+            Latitude = latitudeValue,
+            Longitude = longitudeValue
+        };
     }
 
     private static IReadOnlyList<DeviceSpec> ExtractSpecs(

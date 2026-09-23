@@ -1,4 +1,4 @@
-name: Test applications
+name: Application test gate
 
 on:
   pull_request:
@@ -6,35 +6,148 @@ on:
       - "cloud-cluster/apps/**"
       - "remote-cluster/apps/**"
       - ".github/workflows/apps-pr.yml"
+      - ".github/workflows/python-app-tests.yml"
+
+concurrency:
+  group: application-tests-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  changes:
+    name: Detect application changes
     runs-on: ubuntu-latest
+    outputs:
+      edge_heartbeat: ${{ steps.filter.outputs.edge_heartbeat }}
+      device_service: ${{ steps.filter.outputs.device_service }}
+      location_service: ${{ steps.filter.outputs.location_service }}
+      camera_capture: ${{ steps.filter.outputs.camera_capture }}
+      image_uploader: ${{ steps.filter.outputs.image_uploader }}
+      telemetry_api: ${{ steps.filter.outputs.telemetry_api }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: filter
+        name: Select affected applications
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed_files="$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
+          workflow_changed=false
+          if grep -q "^\\.github/workflows/\\(apps-pr\\|python-app-tests\\)\\.yml$" <<<"${changed_files}"; then
+            workflow_changed=true
+          fi
+
+          changed() {
+            local directory="$1"
+            if [ "${workflow_changed}" = true ] || grep -q "^${directory}/" <<<"${changed_files}"; then
+              echo true
+            else
+              echo false
+            fi
+          }
+
+          {
+            echo "edge_heartbeat=$(changed remote-cluster/apps/edge-heartbeat)"
+            echo "device_service=$(changed remote-cluster/apps/device-service)"
+            echo "location_service=$(changed remote-cluster/apps/location-service)"
+            echo "camera_capture=$(changed remote-cluster/apps/camera-capture)"
+            echo "image_uploader=$(changed remote-cluster/apps/image-uploader)"
+            echo "telemetry_api=$(changed cloud-cluster/apps)"
+          } >>"${GITHUB_OUTPUT}"
+
+  edge-heartbeat-tests:
+    name: Edge heartbeat tests
+    needs: changes
+    if: needs.changes.outputs.edge_heartbeat == 'true'
+    uses: ./.github/workflows/python-app-tests.yml
+    with:
+      app: edge-heartbeat
+
+  device-service-tests:
+    name: Device service tests
+    needs: changes
+    if: needs.changes.outputs.device_service == 'true'
+    uses: ./.github/workflows/python-app-tests.yml
+    with:
+      app: device-service
+
+  location-service-tests:
+    name: Location service tests
+    needs: changes
+    if: needs.changes.outputs.location_service == 'true'
+    uses: ./.github/workflows/python-app-tests.yml
+    with:
+      app: location-service
+
+  camera-capture-tests:
+    name: Camera capture tests
+    needs: changes
+    if: needs.changes.outputs.camera_capture == 'true'
+    uses: ./.github/workflows/python-app-tests.yml
+    with:
+      app: camera-capture
+
+  image-uploader-tests:
+    name: Image uploader tests
+    needs: changes
+    if: needs.changes.outputs.image_uploader == 'true'
+    uses: ./.github/workflows/python-app-tests.yml
+    with:
+      app: image-uploader
+
+  telemetry-tests:
+    name: Telemetry API tests
+    needs: changes
+    if: needs.changes.outputs.telemetry_api == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: remote-cluster/apps/*/requirements.txt
-      - name: Install edge dependencies
-        run: |
-          pip install --requirement remote-cluster/apps/edge-heartbeat/requirements.txt
-          pip install --requirement remote-cluster/apps/device-service/requirements.txt
-          pip install --requirement remote-cluster/apps/camera-capture/requirements.txt
-          pip install --requirement remote-cluster/apps/image-uploader/requirements.txt
-      - name: Test edge applications
-        shell: bash
-        run: |
-          set -euo pipefail
-          for app in edge-heartbeat device-service camera-capture image-uploader; do
-            (cd "remote-cluster/apps/${app}" && python -m unittest --verbose)
-          done
       - name: Test heartbeat monitor
-        run: dotnet test cloud-cluster/apps/telemetry-api.Tests/HeartbeatMonitor.Tests.csproj --configuration Release
+        run: >-
+          dotnet test
+          cloud-cluster/apps/telemetry-api.Tests/HeartbeatMonitor.Tests.csproj
+          --configuration Release
+          --nologo
+
+  required:
+    name: Required application tests
+    if: always()
+    needs:
+      - changes
+      - edge-heartbeat-tests
+      - device-service-tests
+      - location-service-tests
+      - camera-capture-tests
+      - image-uploader-tests
+      - telemetry-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all application tests passed
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          EDGE_HEARTBEAT_RESULT: ${{ needs.edge-heartbeat-tests.result }}
+          DEVICE_SERVICE_RESULT: ${{ needs.device-service-tests.result }}
+          LOCATION_SERVICE_RESULT: ${{ needs.location-service-tests.result }}
+          CAMERA_CAPTURE_RESULT: ${{ needs.camera-capture-tests.result }}
+          IMAGE_UPLOADER_RESULT: ${{ needs.image-uploader-tests.result }}
+          TELEMETRY_RESULT: ${{ needs.telemetry-tests.result }}
+        run: |
+          test "${CHANGES_RESULT}" = "success"
+          for result in \
+            "${EDGE_HEARTBEAT_RESULT}" \
+            "${DEVICE_SERVICE_RESULT}" \
+            "${LOCATION_SERVICE_RESULT}" \
+            "${CAMERA_CAPTURE_RESULT}" \
+            "${IMAGE_UPLOADER_RESULT}" \
+            "${TELEMETRY_RESULT}"; do
+            test "${result}" = "success" || test "${result}" = "skipped"
+          done

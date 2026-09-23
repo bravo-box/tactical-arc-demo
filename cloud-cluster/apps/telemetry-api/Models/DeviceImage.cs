@@ -49,4 +49,7 @@ public sealed class DeviceImage
 
     [JsonPropertyName("deviceInfo")]
     public Dictionary<string, JsonElement> DeviceInfo { get; set; } = [];
+
+    [JsonPropertyName("location")]
+    public DeviceLocation? Location { get; set; }
 }

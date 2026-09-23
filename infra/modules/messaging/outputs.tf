@@ -22,6 +22,10 @@ output "take_picture_queue_name" {
   value = azurerm_servicebus_queue.take_picture.name
 }
 
+output "update_location_queue_name" {
+  value = azurerm_servicebus_queue.update_location.name
+}
+
 output "image_upload_topic_name" {
   value = azurerm_servicebus_topic.image_upload.name
 }

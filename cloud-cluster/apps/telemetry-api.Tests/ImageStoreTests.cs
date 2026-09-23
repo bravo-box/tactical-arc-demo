@@ -56,6 +56,10 @@ public sealed class ImageStoreTests
               "correlationId": "11a3524e-86b3-4428-9f9a-abf51136f1ad",
               "deviceInfo": {
                 "model": "Jetson Nano"
+              },
+              "location": {
+                "latitude": 47.61,
+                "longitude": -122.33
               }
             }
             """;
@@ -67,6 +71,8 @@ public sealed class ImageStoreTests
         Assert.Equal("command-1", image.CommandId);
         Assert.Equal(Guid.Parse("11a3524e-86b3-4428-9f9a-abf51136f1ad"), image.CorrelationId);
         Assert.Equal("Jetson Nano", image.DeviceInfo["model"].GetString());
+        Assert.Equal(47.61, image.Location?.Latitude);
+        Assert.Equal(-122.33, image.Location?.Longitude);
     }
 
     private static DeviceImage CreateImage(string id, string deviceId, int minute) =>
