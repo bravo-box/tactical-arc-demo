@@ -3,18 +3,6 @@
   "healthStatus": "Green",
   "heartbeatIntervalSeconds": 5,
   "serviceBusTopic": "edge-heartbeat",
-  "location": {
-    "latitude": 38.8977,
-    "longitude": -77.0365
-  },
-  "specs": [
-    {
-      "name": "architecture",
-      "value": "arm64"
-    },
-    {
-      "name": "camera",
-      "value": "usb"
-    }
-  ]
+  "mqttPort": 1883,
+  "deviceInfoTimeoutSeconds": 5
 }

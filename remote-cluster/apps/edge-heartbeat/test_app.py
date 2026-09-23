@@ -19,8 +19,9 @@ class EdgeHeartbeatTests(unittest.TestCase):
                         "healthStatus": "Green",
                         "heartbeatIntervalSeconds": 5,
                         "serviceBusTopic": "edge-heartbeat",
-                        "location": {"latitude": 38.8977, "longitude": -77.0365},
-                        "specs": [{"name": "architecture", "value": "arm64"}],
+                        "mqttHost": "mqtt",
+                        "mqttPort": 1883,
+                        "deviceInfoTimeoutSeconds": 5,
                     }
                 ),
                 encoding="utf-8",
@@ -32,8 +33,9 @@ class EdgeHeartbeatTests(unittest.TestCase):
         self.assertEqual(config["healthStatus"], "Green")
         self.assertEqual(config["heartbeatIntervalSeconds"], 5.0)
         self.assertEqual(config["serviceBusTopic"], "edge-heartbeat")
-        self.assertEqual(config["location"]["latitude"], 38.8977)
-        self.assertEqual(config["specs"][0]["value"], "arm64")
+        self.assertEqual(config["mqttHost"], "mqtt")
+        self.assertEqual(config["mqttPort"], 1883)
+        self.assertEqual(config["deviceInfoTimeoutSeconds"], 5.0)
 
     def test_load_config_rejects_non_positive_interval(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -73,8 +75,7 @@ class EdgeHeartbeatTests(unittest.TestCase):
         heartbeat = app.build_heartbeat(
             "edge-01",
             "Green",
-            {"latitude": 38.8977, "longitude": -77.0365},
-            [{"name": "architecture", "value": "arm64"}],
+            {"model": "Jetson Nano"},
         )
 
         self.assertEqual(heartbeat["type"], "edge-heartbeat")
@@ -83,27 +84,7 @@ class EdgeHeartbeatTests(unittest.TestCase):
         self.assertTrue(heartbeat["ipAddress"])
         self.assertTrue(heartbeat["id"])
         self.assertTrue(heartbeat["timestamp"])
-        self.assertEqual(heartbeat["location"]["longitude"], -77.0365)
-        self.assertEqual(heartbeat["specs"][0]["name"], "architecture")
-
-    def test_load_config_rejects_invalid_location(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "config.json"
-            path.write_text(
-                json.dumps(
-                    {
-                        "device-name": "edge-01",
-                        "healthStatus": "Green",
-                        "heartbeatIntervalSeconds": 5,
-                        "serviceBusTopic": "edge-heartbeat",
-                        "location": {"latitude": 91, "longitude": 0},
-                    }
-                ),
-                encoding="utf-8",
-            )
-
-            with self.assertRaisesRegex(ValueError, "latitude"):
-                app.load_config(path)
+        self.assertEqual(heartbeat["deviceInfo"]["model"], "Jetson Nano")
 
     def test_namespace_connection_string_removes_entity_path(self) -> None:
         connection_string = (

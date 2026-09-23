@@ -12,6 +12,7 @@ from typing import Any
 
 from azure.servicebus import ServiceBusClient, ServiceBusMessage
 from azure.servicebus.exceptions import ServiceBusError
+from device_info_client import DeviceInfoClient
 
 CONFIG_PATH = Path(os.environ.get("EDGE_HEARTBEAT_CONFIG", "/etc/edge-heartbeat/config.json"))
 CONNECTION_STRING_ENV = "SERVICEBUS_CONNECTION_STRING"
@@ -41,51 +42,25 @@ def load_config(path: Path) -> dict[str, Any]:
     if health_status not in ("Green", "Yellow", "Red"):
         raise ValueError("healthStatus must be Green, Yellow, or Red")
 
-    location = config.get("location")
-    if location is not None:
-        if not isinstance(location, dict):
-            raise ValueError("location must be an object")
-        latitude = location.get("latitude")
-        longitude = location.get("longitude")
-        if (
-            not isinstance(latitude, (int, float))
-            or isinstance(latitude, bool)
-            or not -90 <= latitude <= 90
-        ):
-            raise ValueError("location.latitude must be between -90 and 90")
-        if (
-            not isinstance(longitude, (int, float))
-            or isinstance(longitude, bool)
-            or not -180 <= longitude <= 180
-        ):
-            raise ValueError("location.longitude must be between -180 and 180")
-        location = {"latitude": float(latitude), "longitude": float(longitude)}
-
-    specs = config.get("specs", [])
-    if not isinstance(specs, list):
-        raise ValueError("specs must be an array")
-    normalized_specs: list[dict[str, str]] = []
-    for spec in specs:
-        if not isinstance(spec, dict):
-            raise ValueError("each spec must be an object")
-        name = spec.get("name")
-        value = spec.get("value")
-        if (
-            not isinstance(name, str)
-            or not name.strip()
-            or not isinstance(value, str)
-            or not value.strip()
-        ):
-            raise ValueError("each spec must have non-empty name and value strings")
-        normalized_specs.append({"name": name.strip(), "value": value.strip()})
+    mqtt_host = os.environ.get("MQTT_HOST", config.get("mqttHost", "localhost"))
+    if not isinstance(mqtt_host, str) or not mqtt_host.strip():
+        raise ValueError("mqttHost must be a non-empty string")
+    device_info_timeout = config.get("deviceInfoTimeoutSeconds", 5)
+    if (
+        not isinstance(device_info_timeout, (int, float))
+        or isinstance(device_info_timeout, bool)
+        or device_info_timeout <= 0
+    ):
+        raise ValueError("deviceInfoTimeoutSeconds must be a positive number")
 
     return {
         "device-name": device_name.strip(),
         "healthStatus": health_status,
         "heartbeatIntervalSeconds": float(interval),
         "serviceBusTopic": topic.strip(),
-        "location": location,
-        "specs": normalized_specs,
+        "mqttHost": mqtt_host.strip(),
+        "mqttPort": int(config.get("mqttPort", 1883)),
+        "deviceInfoTimeoutSeconds": float(device_info_timeout),
     }
 
 
@@ -104,22 +79,17 @@ def get_ip_address() -> str:
 def build_heartbeat(
     device_name: str,
     health_status: str,
-    location: dict[str, float] | None = None,
-    specs: list[dict[str, str]] | None = None,
+    device_info: dict[str, Any],
 ) -> dict[str, Any]:
-    heartbeat: dict[str, Any] = {
+    return {
         "id": str(uuid.uuid4()),
         "type": "edge-heartbeat",
         "device-name": device_name,
         "ipAddress": get_ip_address(),
         "healthStatus": health_status,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "deviceInfo": device_info,
     }
-    if location is not None:
-        heartbeat["location"] = location
-    if specs:
-        heartbeat["specs"] = specs
-    return heartbeat
 
 
 def namespace_connection_string(connection_string: str) -> str:
@@ -149,35 +119,45 @@ def main() -> None:
     interval = config["heartbeatIntervalSeconds"]
     device_name = config["device-name"]
     health_status = config["healthStatus"]
+    device_info_client = DeviceInfoClient(
+        config["mqttHost"],
+        config["mqttPort"],
+        config["deviceInfoTimeoutSeconds"],
+        client_id=f"edge-heartbeat-{device_name}",
+    )
     print(
         f"edge-heartbeat device={device_name} topic={topic} interval={interval:g}s",
         flush=True,
     )
 
-    with client, client.get_topic_sender(topic_name=topic) as sender:
-        while True:
-            heartbeat = build_heartbeat(
-                device_name,
-                health_status,
-                config["location"],
-                config["specs"],
-            )
-            message = ServiceBusMessage(
-                json.dumps(heartbeat, separators=(",", ":")),
-                content_type="application/json",
-                message_id=heartbeat["id"],
-                subject="heartbeat",
-                application_properties={"device-name": device_name},
-            )
-            try:
-                sender.send_messages(message)
-                print(
-                    f"heartbeat sent id={heartbeat['id']} timestamp={heartbeat['timestamp']}",
-                    flush=True,
-                )
-            except ServiceBusError as exc:
-                print(f"heartbeat send failed: {exc}", flush=True)
-            time.sleep(interval)
+    try:
+        with client, client.get_topic_sender(topic_name=topic) as sender:
+            while True:
+                try:
+                    device_info = device_info_client.request()
+                    heartbeat = build_heartbeat(device_name, health_status, device_info)
+                    message = ServiceBusMessage(
+                        json.dumps(heartbeat, separators=(",", ":")),
+                        content_type="application/json",
+                        message_id=heartbeat["id"],
+                        subject="heartbeat",
+                        application_properties={"device-name": device_name},
+                    )
+                except (RuntimeError, TimeoutError) as exc:
+                    print(f"heartbeat skipped: {exc}", flush=True)
+                    time.sleep(interval)
+                    continue
+                try:
+                    sender.send_messages(message)
+                    print(
+                        f"heartbeat sent id={heartbeat['id']} timestamp={heartbeat['timestamp']}",
+                        flush=True,
+                    )
+                except ServiceBusError as exc:
+                    print(f"heartbeat send failed: {exc}", flush=True)
+                time.sleep(interval)
+    finally:
+        device_info_client.close()
 
 
 if __name__ == "__main__":

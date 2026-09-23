@@ -12,16 +12,8 @@ edgeHeartbeat:
       "healthStatus": "Green",
       "heartbeatIntervalSeconds": 5,
       "serviceBusTopic": "edge-heartbeat",
-      "location": {
-        "latitude": 38.8977,
-        "longitude": -77.0365
-      },
-      "specs": [
-        {
-          "name": "architecture",
-          "value": "arm64"
-        }
-      ]
+      "mqttPort": 1883,
+      "deviceInfoTimeoutSeconds": 5
     }
   resources:
     requests:
@@ -33,6 +25,20 @@ edgeHeartbeat:
 
 imagePipeline:
   enabled: false
+
+deviceService:
+  image:
+    repository: device-service
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  configHostPath: /etc/tactical-arc/device-info.json
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 96Mi
 
 mqtt:
   image:
@@ -99,7 +105,8 @@ imageUploader:
       "imageUploadTopic": "image-upload",
       "serviceBusFullyQualifiedNamespace": "",
       "connectivityHost": "1.1.1.1",
-      "connectivityPort": 443
+      "connectivityPort": 443,
+      "deviceInfoTimeoutSeconds": 5
     }
   resources:
     requests:

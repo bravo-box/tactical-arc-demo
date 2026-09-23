@@ -1,8 +1,9 @@
 # Edge device setup
 
 These scripts configure a Jetson Nano, Raspberry Pi, or Debian/Ubuntu edge
-device with K3s, Azure Arc-enabled Kubernetes, Service Bus, and the
-`edge-heartbeat` application. The chart also contains an opt-in camera image
+device with K3s, Azure Arc-enabled Kubernetes, Service Bus, the
+`edge-heartbeat` application, and a local MQTT-backed `device-service`.
+The chart also contains an opt-in camera image
 pipeline for a V4L2-compatible camera such as `/dev/video0`.
 
 ## Prerequisites
@@ -66,7 +67,7 @@ and an identity integration because local authentication is disabled.
 
 ## 4. Configure, build, and deploy
 
-Edit the device-local configuration:
+Edit the heartbeat configuration:
 
 ```json
 {
@@ -74,22 +75,36 @@ Edit the device-local configuration:
   "healthStatus": "Green",
   "heartbeatIntervalSeconds": 5,
   "serviceBusTopic": "edge-heartbeat",
-  "location": {
-    "latitude": 38.8977,
-    "longitude": -77.0365
-  },
-  "specs": [
-    {
-      "name": "architecture",
-      "value": "arm64"
-    }
-  ]
+  "mqttPort": 1883,
+  "deviceInfoTimeoutSeconds": 5
 }
 ```
 
-`location` and `specs` are optional. When present, the cloud application saves
-them with the device's bounded heartbeat and image metadata histories in its
-single Cosmos DB document.
+Edit `remote-cluster/config/device-info.json` on the device with the stable
+device information to include in heartbeats and image metadata:
+
+```json
+{
+  "deviceId": "edge-01",
+  "manufacturer": "Example",
+  "model": "Edge Device",
+  "serialNumber": "replace-me",
+  "architecture": "arm64",
+  "location": {
+    "latitude": 38.8977,
+    "longitude": -77.0365
+  }
+}
+```
+
+The deploy script mounts this file directly from the device filesystem as a
+read-only `hostPath`. Pass `--device-config /absolute/path/device-info.json`
+to use another location.
+
+The cloud application preserves the full `deviceInfo` object in the device's
+single Cosmos DB document. A `location` object with numeric `latitude` and
+`longitude` becomes the document location, while the other device information
+fields are also represented in the document's specs array.
 
 Then build a multi-architecture image and deploy the local chart:
 
@@ -107,7 +122,8 @@ Then build a multi-architecture image and deploy the local chart:
 
 ./remote-cluster/scripts/deploy.sh \
   --registry "<registry>" \
-  --config remote-cluster/config/edge-heartbeat.json
+  --config remote-cluster/config/edge-heartbeat.json \
+  --device-config remote-cluster/config/device-info.json
 ```
 
 To install a remote chart instead, pass a repository chart, archive URL, or OCI
@@ -130,6 +146,9 @@ kubectl -n tactical-arc logs \
 
 The deploy script creates the Kubernetes Secret directly before invoking Helm,
 so the Service Bus credential is not stored in Helm values or release history.
+The heartbeat publishes only after a correlated `DeviceInfoRequest` /
+`DeviceInfoResponse` exchange with `device-service`, preventing incomplete
+device records when the local configuration is unavailable.
 
 ## Camera image pipeline
 
@@ -160,7 +179,9 @@ The command body accepts either form:
 {"command":"TakePicture","id":"11a3524e-86b3-4428-9f9a-abf51136f1ad","correlationId":"11a3524e-86b3-4428-9f9a-abf51136f1ad","deviceId":"edge-01"}
 ```
 
-The capture service emits `SendImage` on `edge/images/send`. The uploader keeps
+The capture service emits `SendImage` on `edge/images/send`. Before upload, the
+uploader requests current device information and adds it to the blob metadata
+and `ImageUpload` event. The uploader keeps
 the JPEG and JSON manifest on the persistent volume until both the blob upload
 and `ImageUpload` Service Bus notification succeed. With no connectivity it
 checks every five seconds, opens after five failures, waits one minute, then

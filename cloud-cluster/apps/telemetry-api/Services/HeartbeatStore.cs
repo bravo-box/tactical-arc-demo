@@ -1,3 +1,4 @@
+using System.Text.Json;
 using HeartbeatMonitor.Models;
 using Microsoft.Extensions.Options;
 
@@ -36,7 +37,11 @@ public sealed class HeartbeatStore
         Heartbeat heartbeat,
         CancellationToken cancellationToken)
     {
-        var validationError = Validate(heartbeat);
+        var location = heartbeat.Location ?? ExtractLocation(heartbeat.DeviceInfo);
+        var specs = heartbeat.Specs?.Select(
+                spec => new DeviceSpec(spec.Name.Trim(), spec.Value.Trim())).ToArray()
+            ?? ExtractSpecs(heartbeat.DeviceInfo);
+        var validationError = Validate(heartbeat, location, specs);
         if (validationError is not null)
         {
             return (false, validationError);
@@ -48,8 +53,9 @@ public sealed class HeartbeatStore
             NormalizeStatus(heartbeat.HealthStatus),
             heartbeat.Timestamp,
             _timeProvider.GetUtcNow(),
-            heartbeat.Location,
-            heartbeat.Specs?.Select(spec => new DeviceSpec(spec.Name.Trim(), spec.Value.Trim())).ToArray() ?? []);
+            location,
+            specs,
+            heartbeat.DeviceInfo);
 
         await _documents.AddHeartbeatAsync(
             received,
@@ -90,10 +96,14 @@ public sealed class HeartbeatStore
                 IsActive(device.LastSeen, _timeProvider.GetUtcNow()),
                 device.Location,
                 device.Specs,
+                device.DeviceInfo,
                 device.Heartbeats);
     }
 
-    private static string? Validate(Heartbeat heartbeat)
+    private static string? Validate(
+        Heartbeat heartbeat,
+        DeviceLocation? location,
+        IReadOnlyList<DeviceSpec> specs)
     {
         if (string.IsNullOrWhiteSpace(heartbeat.DeviceName))
         {
@@ -110,25 +120,55 @@ public sealed class HeartbeatStore
             return "healthStatus must be Green, Yellow, or Red";
         }
 
-        if (heartbeat.Location is { Latitude: < -90 or > 90 })
+        if (location is { Latitude: < -90 or > 90 })
         {
             return "location.latitude must be between -90 and 90";
         }
 
-        if (heartbeat.Location is { Longitude: < -180 or > 180 })
+        if (location is { Longitude: < -180 or > 180 })
         {
             return "location.longitude must be between -180 and 180";
         }
 
-        if (heartbeat.Specs?.Any(
+        if (specs.Any(
                 spec => string.IsNullOrWhiteSpace(spec.Name) ||
-                        string.IsNullOrWhiteSpace(spec.Value)) == true)
+                        string.IsNullOrWhiteSpace(spec.Value)))
         {
             return "spec names and values must be non-empty";
         }
 
         return null;
     }
+
+    private static DeviceLocation? ExtractLocation(
+        IReadOnlyDictionary<string, JsonElement> deviceInfo)
+    {
+        if (!deviceInfo.TryGetValue("location", out var location) ||
+            location.ValueKind != JsonValueKind.Object ||
+            !location.TryGetProperty("latitude", out var latitude) ||
+            !location.TryGetProperty("longitude", out var longitude) ||
+            !latitude.TryGetDouble(out var latitudeValue) ||
+            !longitude.TryGetDouble(out var longitudeValue))
+        {
+            return null;
+        }
+
+        return new DeviceLocation(latitudeValue, longitudeValue);
+    }
+
+    private static IReadOnlyList<DeviceSpec> ExtractSpecs(
+        IReadOnlyDictionary<string, JsonElement> deviceInfo) =>
+        deviceInfo
+            .Where(pair =>
+                !string.Equals(pair.Key, "deviceId", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(pair.Key, "location", StringComparison.OrdinalIgnoreCase))
+            .Select(pair => new DeviceSpec(pair.Key, FormatSpecValue(pair.Value)))
+            .ToArray();
+
+    private static string FormatSpecValue(JsonElement value) =>
+        value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? string.Empty
+            : value.GetRawText();
 
     private bool IsActive(DateTimeOffset lastSeen, DateTimeOffset now) =>
         now - lastSeen <= TimeSpan.FromSeconds(_options.ActiveDeviceTimeoutSeconds);

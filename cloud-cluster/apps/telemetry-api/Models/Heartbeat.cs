@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace HeartbeatMonitor.Models;
@@ -21,6 +22,9 @@ public sealed record Heartbeat
 
     [JsonPropertyName("specs")]
     public IReadOnlyList<DeviceSpec>? Specs { get; init; }
+
+    [JsonPropertyName("deviceInfo")]
+    public Dictionary<string, JsonElement> DeviceInfo { get; init; } = [];
 }
 
 public sealed record DeviceLocation(double Latitude, double Longitude);
@@ -34,7 +38,8 @@ public sealed record ReceivedHeartbeat(
     DateTimeOffset Timestamp,
     DateTimeOffset ReceivedAt,
     DeviceLocation? Location,
-    IReadOnlyList<DeviceSpec> Specs);
+    IReadOnlyList<DeviceSpec> Specs,
+    IReadOnlyDictionary<string, JsonElement> DeviceInfo);
 
 public sealed record DeviceSummary(
     string DeviceName,
@@ -51,4 +56,5 @@ public sealed record DeviceDetails(
     bool IsActive,
     DeviceLocation? Location,
     IReadOnlyList<DeviceSpec> Specs,
+    IReadOnlyDictionary<string, JsonElement> DeviceInfo,
     IReadOnlyList<ReceivedHeartbeat> Heartbeats);

@@ -1,6 +1,7 @@
 using HeartbeatMonitor.Models;
 using HeartbeatMonitor.Services;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 using Xunit;
 
 namespace HeartbeatMonitor.Tests;
@@ -21,6 +22,7 @@ public sealed class HeartbeatStoreTests
         Assert.Equal("Red", device.HealthStatus);
         Assert.Equal(2, device.Heartbeats.Count);
         Assert.True(device.IsActive);
+        Assert.Equal("Jetson Nano", device.DeviceInfo["model"].GetString());
     }
 
     [Fact]
@@ -35,13 +37,18 @@ public sealed class HeartbeatStoreTests
     }
 
     [Fact]
-    public async Task TryAddPersistsLocationAndDeviceSpecs()
+    public async Task TryAddDerivesLocationAndSpecsFromDeviceInfo()
     {
         var store = CreateStore();
         var heartbeat = CreateHeartbeat("Green") with
         {
-            Location = new DeviceLocation(38.8977, -77.0365),
-            Specs = [new DeviceSpec("architecture", "arm64")]
+            DeviceInfo = new()
+            {
+                ["deviceId"] = JsonSerializer.SerializeToElement("edge-01"),
+                ["architecture"] = JsonSerializer.SerializeToElement("arm64"),
+                ["location"] = JsonSerializer.SerializeToElement(
+                    new { latitude = 38.8977, longitude = -77.0365 })
+            }
         };
 
         Assert.True((await store.TryAddAsync(heartbeat, default)).Accepted);
@@ -70,6 +77,10 @@ public sealed class HeartbeatStoreTests
             DeviceName = "edge-01",
             IpAddress = "10.0.0.5",
             HealthStatus = status,
-            Timestamp = DateTimeOffset.UtcNow
+            Timestamp = DateTimeOffset.UtcNow,
+            DeviceInfo = new()
+            {
+                ["model"] = JsonSerializer.SerializeToElement("Jetson Nano")
+            }
         };
 }

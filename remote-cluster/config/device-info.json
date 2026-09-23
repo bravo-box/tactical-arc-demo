@@ -1,0 +1,12 @@
+{
+  "deviceId": "edge-01",
+  "manufacturer": "Example",
+  "model": "Edge Device",
+  "serialNumber": "replace-me",
+  "architecture": "arm64",
+  "camera": "usb",
+  "location": {
+    "latitude": 38.8977,
+    "longitude": -77.0365
+  }
+}

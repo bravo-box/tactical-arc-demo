@@ -35,6 +35,13 @@ internal sealed class TestDeviceDocumentStore : IDeviceDocumentStore
             document.Specs = [.. heartbeat.Specs];
         }
 
+        if (heartbeat.DeviceInfo.Count > 0)
+        {
+            document.DeviceInfo = new Dictionary<string, System.Text.Json.JsonElement>(
+                heartbeat.DeviceInfo,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
         document.Heartbeats.Insert(0, heartbeat);
         Trim(document.Heartbeats, maxHeartbeats);
         return Task.FromResult(document);

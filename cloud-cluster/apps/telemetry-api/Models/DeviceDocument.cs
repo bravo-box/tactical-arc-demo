@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace HeartbeatMonitor.Models;
 
 public sealed class DeviceDocument
@@ -15,6 +17,8 @@ public sealed class DeviceDocument
     public DeviceLocation? Location { get; set; }
 
     public List<DeviceSpec> Specs { get; set; } = [];
+
+    public Dictionary<string, JsonElement> DeviceInfo { get; set; } = [];
 
     public List<ReceivedHeartbeat> Heartbeats { get; set; } = [];
 
