@@ -1,0 +1,76 @@
+{{- if .Values.imagePipeline.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "remote-cluster.fullname" . }}-image-uploader
+  labels:
+    {{- include "remote-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/component: image-uploader
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "remote-cluster.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: image-uploader
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ .Values.imageUploader.config | sha256sum }}
+      labels:
+        {{- include "remote-cluster.labels" . | nindent 8 }}
+        app.kubernetes.io/component: image-uploader
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: image-uploader
+          image: {{ if .Values.imageRegistry }}{{ .Values.imageRegistry }}/{{ end }}{{ .Values.imageUploader.image.repository }}:{{ .Values.imageUploader.image.tag }}
+          imagePullPolicy: {{ .Values.imageUploader.image.pullPolicy }}
+          env:
+            - name: MQTT_HOST
+              value: {{ include "remote-cluster.fullname" . }}-mqtt
+            {{- if .Values.imageUploader.serviceBus.existingSecret }}
+            - name: SERVICEBUS_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.imageUploader.serviceBus.existingSecret }}
+                  key: {{ .Values.imageUploader.serviceBus.connectionStringKey }}
+            {{- end }}
+            {{- if .Values.imageUploader.storage.existingSecret }}
+            - name: STORAGE_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.imageUploader.storage.existingSecret }}
+                  key: {{ .Values.imageUploader.storage.connectionStringKey }}
+            {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/image-uploader
+              readOnly: true
+            - name: images
+              mountPath: /var/lib/edge-images
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.imageUploader.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "remote-cluster.fullname" . }}-image-pipeline
+            items:
+              - key: uploader.json
+                path: config.json
+        - name: images
+          persistentVolumeClaim:
+            claimName: {{ include "remote-cluster.fullname" . }}-images
+{{- end }}

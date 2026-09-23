@@ -1,0 +1,80 @@
+{{- if .Values.imagePipeline.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "remote-cluster.fullname" . }}-mqtt
+  labels:
+    {{- include "remote-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mqtt
+spec:
+  ports:
+    - name: mqtt
+      port: {{ .Values.mqtt.port }}
+      targetPort: mqtt
+  selector:
+    app.kubernetes.io/name: {{ include "remote-cluster.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: mqtt
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "remote-cluster.fullname" . }}-mqtt
+  labels:
+    {{- include "remote-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mqtt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "remote-cluster.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: mqtt
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ .Values.mqtt.port | toString | sha256sum }}
+      labels:
+        {{- include "remote-cluster.labels" . | nindent 8 }}
+        app.kubernetes.io/component: mqtt
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1883
+        runAsGroup: 1883
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mqtt
+          image: {{ if .Values.imageRegistry }}{{ .Values.imageRegistry }}/{{ end }}{{ .Values.mqtt.image.repository }}:{{ .Values.mqtt.image.tag }}
+          imagePullPolicy: {{ .Values.mqtt.image.pullPolicy }}
+          args:
+            - mosquitto
+            - -c
+            - /mosquitto/config/mosquitto.conf
+          ports:
+            - name: mqtt
+              containerPort: {{ .Values.mqtt.port }}
+          readinessProbe:
+            tcpSocket:
+              port: mqtt
+          livenessProbe:
+            tcpSocket:
+              port: mqtt
+          volumeMounts:
+            - name: config
+              mountPath: /mosquitto/config
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.mqtt.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "remote-cluster.fullname" . }}-image-pipeline
+{{- end }}

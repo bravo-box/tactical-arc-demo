@@ -1,0 +1,4 @@
+azure-servicebus==7.14.2
+azure-storage-blob==12.26.0
+azure-identity==1.25.0
+paho-mqtt==2.1.0

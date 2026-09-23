@@ -1,0 +1,17 @@
+{{- if .Values.imagePipeline.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "remote-cluster.fullname" . }}-images
+  labels:
+    {{- include "remote-cluster.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.imageStorage.storageClassName }}
+  storageClassName: {{ .Values.imageStorage.storageClassName | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.imageStorage.size }}
+{{- end }}

@@ -2,7 +2,8 @@
 
 These scripts configure a Jetson Nano, Raspberry Pi, or Debian/Ubuntu edge
 device with K3s, Azure Arc-enabled Kubernetes, Service Bus, and the
-`edge-heartbeat` application.
+`edge-heartbeat` application. The chart also contains an opt-in camera image
+pipeline for a V4L2-compatible camera such as `/dev/video0`.
 
 ## Prerequisites
 
@@ -115,3 +116,43 @@ kubectl -n tactical-arc logs \
 
 The deploy script creates the Kubernetes Secret directly before invoking Helm,
 so the Service Bus credential is not stored in Helm values or release history.
+
+## Camera image pipeline
+
+Apply the Terraform stack, configure the edge identity or Kubernetes secrets,
+then enable the pipeline:
+
+```bash
+helm upgrade --install remote-cluster ./remote-cluster/helm/remote-cluster \
+  --namespace tactical-arc \
+  --set imagePipeline.enabled=true \
+  --set cameraCapture.cameraDeviceHostPath=/dev/video0 \
+  --set cameraCapture.videoGroupId=44
+```
+
+Update `cameraCapture.config` and `imageUploader.config` in `values.yaml` with
+the Terraform Service Bus namespace and storage account URL when using the Arc
+identity. For connection-string authentication, create the three secrets named
+by `cameraCapture.serviceBus`, `imageUploader.serviceBus`, and
+`imageUploader.storage`; each uses a `connection-string` key.
+
+The command body accepts either form:
+
+```json
+{"type":"TakePicture","id":"11a3524e-86b3-4428-9f9a-abf51136f1ad","correlationId":"11a3524e-86b3-4428-9f9a-abf51136f1ad","deviceId":"edge-01"}
+```
+
+```json
+{"command":"TakePicture","id":"11a3524e-86b3-4428-9f9a-abf51136f1ad","correlationId":"11a3524e-86b3-4428-9f9a-abf51136f1ad","deviceId":"edge-01"}
+```
+
+The capture service emits `SendImage` on `edge/images/send`. The uploader keeps
+the JPEG and JSON manifest on the persistent volume until both the blob upload
+and `ImageUpload` Service Bus notification succeed. With no connectivity it
+checks every five seconds, opens after five failures, waits one minute, then
+probes every second until the circuit closes.
+
+The `take-picture` queue requires Service Bus sessions. Each camera receiver
+accepts only the session matching its configured `deviceId`, and the GUID
+`correlationId` is preserved in the MQTT event, blob metadata, `ImageUpload`
+message, and cloud request status.

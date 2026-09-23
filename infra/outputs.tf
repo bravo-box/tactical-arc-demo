@@ -58,6 +58,31 @@ output "heartbeat_monitor_subscription_name" {
   value       = module.messaging.heartbeat_monitor_subscription_name
 }
 
+output "take_picture_queue_name" {
+  description = "Service Bus queue receiving TakePicture commands."
+  value       = module.messaging.take_picture_queue_name
+}
+
+output "image_upload_topic_name" {
+  description = "Service Bus topic receiving ImageUpload events."
+  value       = module.messaging.image_upload_topic_name
+}
+
+output "image_web_subscription_name" {
+  description = "Service Bus subscription consumed by the cloud image gallery."
+  value       = module.messaging.image_web_subscription_name
+}
+
+output "image_storage_account_name" {
+  description = "Storage account containing edge device images."
+  value       = module.messaging.image_storage_account_name
+}
+
+output "image_storage_account_url" {
+  description = "Private blob endpoint used by edge and cloud applications."
+  value       = module.messaging.image_storage_account_url
+}
+
 output "workload_identity_client_id" {
   description = "Client ID to annotate on the telemetry Kubernetes service account."
   value       = module.cloud.workload_identity_client_id

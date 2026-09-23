@@ -21,3 +21,45 @@ public sealed class ServiceBusOptions
 
     public string Subscription { get; set; } = "heartbeat-monitor";
 }
+
+public sealed class ImageServiceBusOptions
+{
+    public const string SectionName = "ImageServiceBus";
+
+    public string? ConnectionString { get; set; }
+
+    public string? FullyQualifiedNamespace { get; set; }
+
+    public string Topic { get; set; } = "image-upload";
+
+    public string Subscription { get; set; } = "image-web";
+}
+
+public sealed class StorageOptions
+{
+    public const string SectionName = "Storage";
+
+    public string? ConnectionString { get; set; }
+
+    public string? AccountUrl { get; set; }
+
+    public string Container { get; set; } = "device-images";
+}
+
+public sealed class ImageFeatureOptions
+{
+    public const string SectionName = "Images";
+
+    public bool Enabled { get; set; }
+}
+
+public sealed class CameraCommandOptions
+{
+    public const string SectionName = "CameraCommands";
+
+    public string? ConnectionString { get; set; }
+
+    public string? FullyQualifiedNamespace { get; set; }
+
+    public string Queue { get; set; } = "take-picture";
+}
