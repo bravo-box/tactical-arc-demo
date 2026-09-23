@@ -53,7 +53,10 @@ public sealed class ImageStoreTests
               "width": 640,
               "height": 480,
               "commandId": "command-1",
-              "correlationId": "11a3524e-86b3-4428-9f9a-abf51136f1ad"
+              "correlationId": "11a3524e-86b3-4428-9f9a-abf51136f1ad",
+              "deviceInfo": {
+                "model": "Jetson Nano"
+              }
             }
             """;
 
@@ -63,6 +66,7 @@ public sealed class ImageStoreTests
         Assert.Equal("edge-01", image.DeviceId);
         Assert.Equal("command-1", image.CommandId);
         Assert.Equal(Guid.Parse("11a3524e-86b3-4428-9f9a-abf51136f1ad"), image.CorrelationId);
+        Assert.Equal("Jetson Nano", image.DeviceInfo["model"].GetString());
     }
 
     private static DeviceImage CreateImage(string id, string deviceId, int minute) =>

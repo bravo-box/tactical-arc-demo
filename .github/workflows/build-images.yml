@@ -36,6 +36,12 @@ jobs:
             context: cloud-cluster/apps/telemetry-api
           - image: edge-heartbeat
             context: remote-cluster/apps/edge-heartbeat
+          - image: device-service
+            context: remote-cluster/apps/device-service
+          - image: camera-capture
+            context: remote-cluster/apps/camera-capture
+          - image: image-uploader
+            context: remote-cluster/apps/image-uploader
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

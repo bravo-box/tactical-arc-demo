@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace HeartbeatMonitor.Models;
@@ -45,4 +46,7 @@ public sealed class DeviceImage
 
     [JsonPropertyName("correlationId")]
     public Guid CorrelationId { get; set; }
+
+    [JsonPropertyName("deviceInfo")]
+    public Dictionary<string, JsonElement> DeviceInfo { get; set; } = [];
 }

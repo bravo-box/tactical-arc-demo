@@ -28,7 +28,8 @@ default deployment:
    recovery manifest to the shared edge volume.
 2. It publishes a QoS 1 `SendImage` event to the local Mosquitto router.
 3. `image-uploader` uploads pending manifests to the private `device-images`
-   blob container. Connectivity is checked every five seconds; five failures
+   blob container after obtaining current device metadata from `device-service`
+   over a correlated local MQTT request. Connectivity is checked every five seconds; five failures
    open the circuit for one minute, followed by one-second half-open probes
    until connectivity returns.
 4. After upload, it publishes `ImageUpload` to Service Bus and removes the

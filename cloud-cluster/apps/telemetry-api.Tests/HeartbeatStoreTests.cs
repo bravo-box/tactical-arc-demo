@@ -1,6 +1,7 @@
 using HeartbeatMonitor.Models;
 using HeartbeatMonitor.Services;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 using Xunit;
 
 namespace HeartbeatMonitor.Tests;
@@ -20,6 +21,7 @@ public sealed class HeartbeatStoreTests
         Assert.Equal("Red", device.HealthStatus);
         Assert.Equal(2, device.Heartbeats.Count);
         Assert.True(device.IsActive);
+        Assert.Equal("Jetson Nano", device.DeviceInfo["model"].GetString());
     }
 
     [Fact]
@@ -49,6 +51,10 @@ public sealed class HeartbeatStoreTests
             DeviceName = "edge-01",
             IpAddress = "10.0.0.5",
             HealthStatus = status,
-            Timestamp = DateTimeOffset.UtcNow
+            Timestamp = DateTimeOffset.UtcNow,
+            DeviceInfo = new()
+            {
+                ["model"] = JsonSerializer.SerializeToElement("Jetson Nano")
+            }
         };
 }

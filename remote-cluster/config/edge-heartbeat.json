@@ -2,5 +2,7 @@
   "device-name": "edge-01",
   "healthStatus": "Green",
   "heartbeatIntervalSeconds": 5,
-  "serviceBusTopic": "edge-heartbeat"
+  "serviceBusTopic": "edge-heartbeat",
+  "mqttPort": 1883,
+  "deviceInfoTimeoutSeconds": 5
 }
