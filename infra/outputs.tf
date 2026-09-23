@@ -93,6 +93,21 @@ output "workload_identity_client_id" {
   value       = module.cloud.workload_identity_client_id
 }
 
+output "cosmosdb_endpoint" {
+  description = "Private Azure Government Cosmos DB endpoint used by the telemetry API."
+  value       = module.cloud.cosmosdb_endpoint
+}
+
+output "cosmosdb_database_name" {
+  description = "Cosmos DB database containing device documents."
+  value       = module.cloud.cosmosdb_database_name
+}
+
+output "cosmosdb_container_name" {
+  description = "Cosmos DB container containing one document per device."
+  value       = module.cloud.cosmosdb_container_name
+}
+
 output "log_analytics_workspace_id" {
   description = "Log Analytics workspace receiving AKS and platform diagnostics."
   value       = module.cloud.log_analytics_workspace_id

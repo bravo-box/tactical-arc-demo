@@ -38,9 +38,15 @@ telemetryApi:
     connectionStringKey: connection-string
   workloadIdentity:
     clientId: ""
+    serviceAccountName: telemetry-api
+  cosmos:
+    endpoint: ""
+    database: telemetry
+    container: devices
   monitor:
     activeDeviceTimeoutSeconds: 30
     maxHeartbeatsPerDevice: 100
+    maxImagesPerDevice: 100
   resources:
     requests:
       cpu: 50m

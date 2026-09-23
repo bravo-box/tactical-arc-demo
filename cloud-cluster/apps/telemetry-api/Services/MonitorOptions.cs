@@ -7,6 +7,19 @@ public sealed class MonitorOptions
     public int ActiveDeviceTimeoutSeconds { get; set; } = 30;
 
     public int MaxHeartbeatsPerDevice { get; set; } = 100;
+
+    public int MaxImagesPerDevice { get; set; } = 100;
+}
+
+public sealed class CosmosOptions
+{
+    public const string SectionName = "Cosmos";
+
+    public string Endpoint { get; set; } = string.Empty;
+
+    public string Database { get; set; } = "telemetry";
+
+    public string Container { get; set; } = "devices";
 }
 
 public sealed class ServiceBusOptions

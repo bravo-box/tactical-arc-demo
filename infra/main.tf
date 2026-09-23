@@ -89,6 +89,7 @@ module "private_link" {
   container_registry_id      = module.cloud.container_registry_id
   servicebus_namespace_id    = module.messaging.servicebus_namespace_id
   storage_account_id         = module.messaging.image_storage_account_id
+  cosmosdb_account_id        = module.cloud.cosmosdb_account_id
   tags                       = local.tags
 }
 

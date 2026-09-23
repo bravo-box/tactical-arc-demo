@@ -102,19 +102,19 @@ public sealed class ServiceBusHeartbeatConsumer : IHostedService, IAsyncDisposab
             return;
         }
 
-        var validationError = heartbeat is null
-            ? "message body is empty"
-            : string.Empty;
-        if (heartbeat is null || !_store.TryAdd(heartbeat, out validationError))
+        var result = heartbeat is null
+            ? (Accepted: false, ValidationError: "message body is empty")
+            : await _store.TryAddAsync(heartbeat, args.CancellationToken);
+        if (!result.Accepted)
         {
             _logger.LogWarning(
                 "Dead-lettering invalid heartbeat {MessageId}: {ValidationError}",
                 args.Message.MessageId,
-                validationError);
+                result.ValidationError);
             await args.DeadLetterMessageAsync(
                 args.Message,
                 "InvalidHeartbeat",
-                validationError,
+                result.ValidationError,
                 args.CancellationToken);
             return;
         }

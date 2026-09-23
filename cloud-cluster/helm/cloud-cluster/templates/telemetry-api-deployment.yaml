@@ -23,7 +23,7 @@ spec:
         azure.workload.identity/use: "true"
         {{- end }}
     spec:
-      serviceAccountName: {{ include "cloud-cluster.fullname" . }}-telemetry-api
+      serviceAccountName: {{ .Values.telemetryApi.workloadIdentity.serviceAccountName }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -71,6 +71,14 @@ spec:
               value: {{ .Values.telemetryApi.monitor.activeDeviceTimeoutSeconds | quote }}
             - name: Monitor__MaxHeartbeatsPerDevice
               value: {{ .Values.telemetryApi.monitor.maxHeartbeatsPerDevice | quote }}
+            - name: Monitor__MaxImagesPerDevice
+              value: {{ .Values.telemetryApi.monitor.maxImagesPerDevice | quote }}
+            - name: Cosmos__Endpoint
+              value: {{ required "telemetryApi.cosmos.endpoint is required" .Values.telemetryApi.cosmos.endpoint | quote }}
+            - name: Cosmos__Database
+              value: {{ .Values.telemetryApi.cosmos.database | quote }}
+            - name: Cosmos__Container
+              value: {{ .Values.telemetryApi.cosmos.container | quote }}
             {{- if .Values.telemetryApi.serviceBus.existingSecret }}
             - name: ServiceBus__ConnectionString
               valueFrom:

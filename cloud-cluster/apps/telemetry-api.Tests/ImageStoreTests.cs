@@ -8,14 +8,14 @@ namespace HeartbeatMonitor.Tests;
 public sealed class ImageStoreTests
 {
     [Fact]
-    public void TryAddReturnsNewestImagesForDevice()
+    public async Task TryAddReturnsNewestImagesForDevice()
     {
-        var store = new ImageStore();
-        Assert.True(store.TryAdd(CreateImage("image-1", "edge-01", 1), out _));
-        Assert.True(store.TryAdd(CreateImage("image-2", "edge-01", 2), out _));
-        Assert.True(store.TryAdd(CreateImage("image-3", "edge-02", 3), out _));
+        var store = CreateStore();
+        Assert.True((await store.TryAddAsync(CreateImage("image-1", "edge-01", 1), default)).Accepted);
+        Assert.True((await store.TryAddAsync(CreateImage("image-2", "edge-01", 2), default)).Accepted);
+        Assert.True((await store.TryAddAsync(CreateImage("image-3", "edge-02", 3), default)).Accepted);
 
-        var images = store.GetImages("EDGE-01");
+        var images = await store.GetImagesAsync("EDGE-01", default);
 
         Assert.Equal(2, images.Count);
         Assert.Equal("image-2", images[0].Id);
@@ -23,16 +23,16 @@ public sealed class ImageStoreTests
     }
 
     [Fact]
-    public void TryAddRejectsInvalidImageUpload()
+    public async Task TryAddRejectsInvalidImageUpload()
     {
-        var store = new ImageStore();
+        var store = CreateStore();
         var image = CreateImage("image-1", "edge-01", 1);
         image.Width = 0;
 
-        var accepted = store.TryAdd(image, out var error);
+        var result = await store.TryAddAsync(image, default);
 
-        Assert.False(accepted);
-        Assert.Contains("positive", error);
+        Assert.False(result.Accepted);
+        Assert.Contains("positive", result.ValidationError);
     }
 
     [Fact]
@@ -91,4 +91,15 @@ public sealed class ImageStoreTests
             Height = 480,
             CorrelationId = Guid.Parse("11a3524e-86b3-4428-9f9a-abf51136f1ad")
         };
+
+    private static ImageStore CreateStore() =>
+        new(
+            new TestDeviceDocumentStore(),
+            Microsoft.Extensions.Options.Options.Create(
+                new MonitorOptions
+                {
+                    ActiveDeviceTimeoutSeconds = 30,
+                    MaxHeartbeatsPerDevice = 100,
+                    MaxImagesPerDevice = 100
+                }));
 }

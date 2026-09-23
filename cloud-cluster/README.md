@@ -7,6 +7,7 @@ Its optional image feature also consumes `image-upload`, reads private blobs,
 and displays image tiles and a full-size metadata modal on the selected device.
 The device view also displays heartbeat coordinates and can queue validated
 location updates for the selected edge device.
+Device state is persisted in a single Cosmos DB JSON document per device.
 
 - `apps/` – containerized application source code and Dockerfiles.
 - `helm/` – Helm chart that deploys the cloud apps and their dependencies.
@@ -19,7 +20,8 @@ location updates for the selected edge device.
 
 Configure either `telemetryApi.serviceBus.existingSecret` with a Service Bus
 connection string, or set `fullyQualifiedNamespace` and `workloadIdentity.clientId`
-for AKS workload identity.
+for AKS workload identity. Cosmos DB always uses workload identity: set
+`telemetryApi.cosmos.endpoint` to the Terraform `cosmosdb_endpoint` output.
 
 Location updates use the session-aware `update-location` queue. Configure
 `telemetryApi.locationCommands.fullyQualifiedNamespace` for workload identity,
@@ -37,8 +39,16 @@ helm upgrade --install cloud-cluster ./cloud-cluster/helm/cloud-cluster \
   --set telemetryApi.cameraCommands.fullyQualifiedNamespace="<namespace>.servicebus.usgovcloudapi.net" \
   --set telemetryApi.locationCommands.fullyQualifiedNamespace="<namespace>.servicebus.usgovcloudapi.net" \
   --set telemetryApi.storage.accountUrl="https://<account>.blob.core.usgovcloudapi.net" \
+  --set telemetryApi.cosmos.endpoint="<terraform cosmosdb_endpoint>" \
   --set telemetryApi.workloadIdentity.clientId="<terraform workload_identity_client_id>"
 ```
+
+The chart uses the `telemetry-api` Kubernetes service account in the
+`tactical-arc` namespace, matching the Terraform federated identity. The
+application stores at most 100 heartbeats and 100 image metadata records in
+each device document by default; configure
+`telemetryApi.monitor.maxHeartbeatsPerDevice` and
+`telemetryApi.monitor.maxImagesPerDevice` to lower those bounds.
 
 For a local/demo namespace, set the image Service Bus and storage
 `existingSecret` values instead. Each secret must contain a `connection-string`

@@ -89,7 +89,8 @@ device information to include in heartbeats and image metadata:
   "deviceId": "edge-01",
   "manufacturer": "Example",
   "model": "Edge Device",
-  "serialNumber": "replace-me"
+  "serialNumber": "replace-me",
+  "architecture": "arm64"
 }
 ```
 
@@ -109,6 +110,11 @@ helm upgrade --install remote-cluster ./remote-cluster/helm/remote-cluster \
   --set locationService.initialLocation.latitude=47.6062 \
   --set locationService.initialLocation.longitude=-122.3321
 ```
+
+The cloud application preserves the full `deviceInfo` object in the device's
+single Cosmos DB document. Location from `location-service` becomes the
+document location, while device information fields are also represented in the
+document's specs array.
 
 Then build a multi-architecture image and deploy the local chart:
 

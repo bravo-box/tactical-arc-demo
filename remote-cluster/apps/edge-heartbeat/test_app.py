@@ -19,6 +19,9 @@ class EdgeHeartbeatTests(unittest.TestCase):
                         "healthStatus": "Green",
                         "heartbeatIntervalSeconds": 5,
                         "serviceBusTopic": "edge-heartbeat",
+                        "mqttHost": "mqtt",
+                        "mqttPort": 1883,
+                        "deviceInfoTimeoutSeconds": 5,
                     }
                 ),
                 encoding="utf-8",
@@ -30,6 +33,9 @@ class EdgeHeartbeatTests(unittest.TestCase):
         self.assertEqual(config["healthStatus"], "Green")
         self.assertEqual(config["heartbeatIntervalSeconds"], 5.0)
         self.assertEqual(config["serviceBusTopic"], "edge-heartbeat")
+        self.assertEqual(config["mqttHost"], "mqtt")
+        self.assertEqual(config["mqttPort"], 1883)
+        self.assertEqual(config["deviceInfoTimeoutSeconds"], 5.0)
 
     def test_load_config_rejects_non_positive_interval(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
