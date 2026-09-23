@@ -10,6 +10,7 @@ public sealed class ServiceBusImageConsumer : IHostedService, IAsyncDisposable
 {
     private readonly ImageServiceBusOptions _options;
     private readonly ImageStore _store;
+    private readonly CaptureRequestStore _requestStore;
     private readonly ILogger<ServiceBusImageConsumer> _logger;
     private ServiceBusClient? _client;
     private ServiceBusProcessor? _processor;
@@ -17,10 +18,12 @@ public sealed class ServiceBusImageConsumer : IHostedService, IAsyncDisposable
     public ServiceBusImageConsumer(
         IOptions<ImageServiceBusOptions> options,
         ImageStore store,
+        CaptureRequestStore requestStore,
         ILogger<ServiceBusImageConsumer> logger)
     {
         _options = options.Value;
         _store = store;
+        _requestStore = requestStore;
         _logger = logger;
     }
 
@@ -103,6 +106,7 @@ public sealed class ServiceBusImageConsumer : IHostedService, IAsyncDisposable
             return;
         }
 
+        _requestStore.MarkUploaded(image);
         await args.CompleteMessageAsync(args.Message, args.CancellationToken);
     }
 

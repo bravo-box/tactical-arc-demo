@@ -20,6 +20,11 @@ telemetryApi:
     fullyQualifiedNamespace: ""
     existingSecret: ""
     connectionStringKey: connection-string
+  cameraCommands:
+    queue: take-picture
+    fullyQualifiedNamespace: ""
+    existingSecret: ""
+    connectionStringKey: connection-string
   storage:
     container: device-images
     accountUrl: ""

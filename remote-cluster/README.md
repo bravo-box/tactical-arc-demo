@@ -139,11 +139,11 @@ by `cameraCapture.serviceBus`, `imageUploader.serviceBus`, and
 The command body accepts either form:
 
 ```json
-{"type":"TakePicture","id":"command-123"}
+{"type":"TakePicture","id":"11a3524e-86b3-4428-9f9a-abf51136f1ad","correlationId":"11a3524e-86b3-4428-9f9a-abf51136f1ad","deviceId":"edge-01"}
 ```
 
 ```json
-{"command":"TakePicture","id":"command-123"}
+{"command":"TakePicture","id":"11a3524e-86b3-4428-9f9a-abf51136f1ad","correlationId":"11a3524e-86b3-4428-9f9a-abf51136f1ad","deviceId":"edge-01"}
 ```
 
 The capture service emits `SendImage` on `edge/images/send`. The uploader keeps
@@ -151,3 +151,8 @@ the JPEG and JSON manifest on the persistent volume until both the blob upload
 and `ImageUpload` Service Bus notification succeed. With no connectivity it
 checks every five seconds, opens after five failures, waits one minute, then
 probes every second until the circuit closes.
+
+The `take-picture` queue requires Service Bus sessions. Each camera receiver
+accepts only the session matching its configured `deviceId`, and the GUID
+`correlationId` is preserved in the MQTT event, blob metadata, `ImageUpload`
+message, and cloud request status.

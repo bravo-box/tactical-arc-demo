@@ -51,6 +51,7 @@ resource "azurerm_servicebus_queue" "take_picture" {
   dead_lettering_on_message_expiration    = true
   duplicate_detection_history_time_window = "PT10M"
   requires_duplicate_detection            = true
+  requires_session                        = true
   default_message_ttl                     = "P1D"
 }
 

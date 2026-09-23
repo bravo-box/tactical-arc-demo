@@ -30,6 +30,12 @@ public sealed class ImageStore
             return false;
         }
 
+        if (image.CorrelationId == Guid.Empty)
+        {
+            validationError = "correlationId must be a GUID";
+            return false;
+        }
+
         _images[image.Id] = image;
         validationError = string.Empty;
         return true;

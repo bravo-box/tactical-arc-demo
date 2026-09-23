@@ -61,6 +61,8 @@ The image pipeline adds the `take-picture` queue, `image-upload` topic with an
 `image-web` subscription, and a private `device-images` blob container. The
 Arc principal receives camera commands, sends upload events, and contributes
 blobs. The AKS workload identity receives upload events and reads blobs.
+The command queue requires sessions so the cloud monitor can target the
+selected device by using its device name as the session ID.
 
 ## AKS workload identity
 

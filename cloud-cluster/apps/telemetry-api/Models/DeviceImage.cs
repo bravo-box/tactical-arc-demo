@@ -42,4 +42,7 @@ public sealed class DeviceImage
 
     [JsonPropertyName("commandId")]
     public string? CommandId { get; set; }
+
+    [JsonPropertyName("correlationId")]
+    public Guid CorrelationId { get; set; }
 }

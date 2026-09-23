@@ -52,3 +52,14 @@ public sealed class ImageFeatureOptions
 
     public bool Enabled { get; set; }
 }
+
+public sealed class CameraCommandOptions
+{
+    public const string SectionName = "CameraCommands";
+
+    public string? ConnectionString { get; set; }
+
+    public string? FullyQualifiedNamespace { get; set; }
+
+    public string Queue { get; set; } = "take-picture";
+}

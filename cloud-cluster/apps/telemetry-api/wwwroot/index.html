@@ -25,6 +25,17 @@
     .label { color: #93a4bc; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
     .value { margin-top: 6px; font-weight: 650; overflow-wrap: anywhere; }
     .status-Green { color: #34d399; } .status-Yellow { color: #fbbf24; } .status-Red { color: #fb7185; }
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+    .take-picture { width: auto; background: #1d4ed8; border-color: #60a5fa; font-weight: 700; }
+    .take-picture:disabled { cursor: wait; opacity: .65; }
+    .error { color: #fb7185; }
+    details { margin: 0 0 24px; border: 1px solid #243249; border-radius: 10px; background: #111b2d; }
+    summary { padding: 14px; cursor: pointer; font-weight: 700; }
+    details table { margin: 0 14px 14px; width: calc(100% - 28px); }
+    .request-status { font-weight: 700; }
+    .request-status.Queued { color: #fbbf24; }
+    .request-status.Uploaded { color: #34d399; }
+    .request-image { width: auto; padding: 4px 8px; }
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 12px; border-bottom: 1px solid #243249; text-align: left; }
     th { color: #93a4bc; font-size: .75rem; text-transform: uppercase; }
@@ -70,6 +81,7 @@
     const imageTitle = document.querySelector("#image-title");
     const imageMetadata = document.querySelector("#image-metadata");
     let selectedDevice = null;
+    let imageCaptureEnabled = false;
 
     const escapeHtml = value => String(value).replace(/[&<>"']/g, char => (
       { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]
@@ -84,7 +96,7 @@
       ["Dimensions", image => `${image.width} × ${image.height}`],
       ["File", "fileName"],
       ["Image ID", "id"],
-      ["Command ID", image => image.commandId || "—"]
+      ["Correlation ID", "correlationId"]
     ];
 
     function openImage(image) {
@@ -121,13 +133,35 @@
 
     async function loadDetails(deviceName) {
       const encodedName = encodeURIComponent(deviceName);
-      const [deviceResponse, imageResponse] = await Promise.all([
+      const responses = [
         fetch(`/api/devices/${encodedName}`),
         fetch(`/api/devices/${encodedName}/images`)
-      ]);
-      if (!deviceResponse.ok || !imageResponse.ok) return;
+      ];
+      if (imageCaptureEnabled) {
+        responses.push(fetch(`/api/devices/${encodedName}/capture-requests`));
+      }
+      const [deviceResponse, imageResponse, requestsResponse] = await Promise.all(responses);
+      if (!deviceResponse.ok || !imageResponse.ok || (requestsResponse && !requestsResponse.ok)) return;
       const device = await deviceResponse.json();
       const images = await imageResponse.json();
+      const requests = requestsResponse ? await requestsResponse.json() : [];
+      const requestsPanelOpen = document.querySelector("#capture-requests")?.open ?? false;
+      const capturePanel = imageCaptureEnabled ? `
+        <div class="toolbar">
+          <button id="take-picture" class="take-picture" type="button">Take picture</button>
+          <span id="capture-error" class="error" role="alert"></span>
+        </div>
+        <details id="capture-requests" ${requestsPanelOpen ? "open" : ""}>
+          <summary>Capture requests (${requests.length})</summary>
+          ${requests.length ? `<table><thead><tr><th>Requested</th><th>Correlation ID</th><th>Status</th><th>Completed</th><th>Image</th></tr></thead>
+          <tbody>${requests.map(request => `<tr>
+            <td>${formatDate(request.requestedAt)}</td>
+            <td>${escapeHtml(request.correlationId)}</td>
+            <td class="request-status ${escapeHtml(request.status)}">${escapeHtml(request.status)}</td>
+            <td>${request.completedAt ? formatDate(request.completedAt) : "—"}</td>
+            <td>${request.imageId ? `<button class="request-image" data-request-image="${escapeHtml(request.imageId)}">${escapeHtml(request.imageId)}</button>` : "—"}</td>
+          </tr>`).join("")}</tbody></table>` : '<div class="empty">No capture requests have been sent for this device.</div>'}
+        </details>` : "";
       contentElement.innerHTML = `
         <div class="details">
           <div class="card"><div class="label">Device</div><div class="value">${escapeHtml(device.deviceName)}</div></div>
@@ -135,6 +169,7 @@
           <div class="card"><div class="label">Health</div><div class="value status-${device.healthStatus}">${escapeHtml(device.healthStatus)}</div></div>
           <div class="card"><div class="label">Last seen</div><div class="value">${formatDate(device.lastSeen)}</div></div>
         </div>
+        ${capturePanel}
         <h2>Heartbeat log</h2>
         <table><thead><tr><th>Received</th><th>Device timestamp</th><th>IP address</th><th>Status</th></tr></thead>
         <tbody>${device.heartbeats.map(heartbeat => `<tr>
@@ -152,13 +187,44 @@
         const image = images.find(candidate => candidate.id === button.dataset.imageId);
         if (image) button.addEventListener("click", () => openImage(image));
       });
+      contentElement.querySelectorAll("[data-request-image]").forEach(button => {
+        const image = images.find(candidate => candidate.id === button.dataset.requestImage);
+        if (image) button.addEventListener("click", () => openImage(image));
+      });
+      document.querySelector("#take-picture")?.addEventListener("click", async event => {
+        const button = event.currentTarget;
+        const error = document.querySelector("#capture-error");
+        button.disabled = true;
+        button.textContent = "Sending…";
+        error.textContent = "";
+        try {
+          const response = await fetch(`/api/devices/${encodedName}/capture-requests`, { method: "POST" });
+          if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body.error || "Could not queue capture request");
+          }
+          await loadDetails(deviceName);
+          document.querySelector("#capture-requests").open = true;
+        } catch (captureError) {
+          error.textContent = captureError.message;
+          button.disabled = false;
+          button.textContent = "Take picture";
+        }
+      });
     }
 
     document.querySelector(".modal-close").addEventListener("click", () => imageDialog.close());
     imageDialog.addEventListener("click", event => {
       if (event.target === imageDialog) imageDialog.close();
     });
-    refreshDevices().catch(error => contentElement.textContent = error.message);
+    async function initialize() {
+      const response = await fetch("/api/features");
+      if (!response.ok) throw new Error("Unable to load application features");
+      imageCaptureEnabled = (await response.json()).imagesEnabled;
+      await refreshDevices();
+    }
+
+    initialize().catch(error => contentElement.textContent = error.message);
     setInterval(() => refreshDevices().catch(console.error), 5000);
   </script>
 </body>

@@ -30,10 +30,39 @@ class CameraCaptureTests(unittest.TestCase):
         self.assertEqual(config["mqttPort"], 1883)
 
     def test_parse_take_picture_accepts_type_or_command(self) -> None:
-        self.assertEqual(app.parse_take_picture('{"type":"TakePicture","id":"1"}')["id"], "1")
-        self.assertIsNotNone(app.parse_take_picture('{"command":"TakePicture"}'))
+        correlation_id = "11a3524e-86b3-4428-9f9a-abf51136f1ad"
+        self.assertEqual(
+            app.parse_take_picture(
+                json.dumps(
+                    {
+                        "type": "TakePicture",
+                        "id": correlation_id,
+                        "correlationId": correlation_id,
+                    }
+                )
+            )["id"],
+            correlation_id,
+        )
+        self.assertIsNotNone(
+            app.parse_take_picture(
+                json.dumps(
+                    {
+                        "command": "TakePicture",
+                        "correlationId": correlation_id,
+                    }
+                )
+            )
+        )
         self.assertIsNone(app.parse_take_picture('{"type":"Restart"}'))
         self.assertIsNone(app.parse_take_picture("not-json"))
+
+    def test_parse_take_picture_requires_matching_device_and_guid(self) -> None:
+        self.assertIsNone(
+            app.parse_take_picture(
+                '{"type":"TakePicture","deviceId":"edge-02","correlationId":"not-a-guid"}',
+                "edge-01",
+            )
+        )
 
     def test_build_metadata_describes_image(self) -> None:
         metadata = app.build_metadata(
@@ -42,7 +71,10 @@ class CameraCaptureTests(unittest.TestCase):
             Path("/images/image-1.jpg"),
             640,
             480,
-            {"id": "command-1"},
+            {
+                "id": "command-1",
+                "correlationId": "11a3524e-86b3-4428-9f9a-abf51136f1ad",
+            },
         )
 
         self.assertEqual(metadata["type"], "SendImage")
@@ -51,6 +83,10 @@ class CameraCaptureTests(unittest.TestCase):
         self.assertTrue(metadata["architecture"])
         self.assertEqual(metadata["width"], 640)
         self.assertEqual(metadata["commandId"], "command-1")
+        self.assertEqual(
+            metadata["correlationId"],
+            "11a3524e-86b3-4428-9f9a-abf51136f1ad",
+        )
 
 
 if __name__ == "__main__":

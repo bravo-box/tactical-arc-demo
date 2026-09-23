@@ -52,7 +52,8 @@ public sealed class ImageStoreTests
               "contentType": "image/jpeg",
               "width": 640,
               "height": 480,
-              "commandId": "command-1"
+              "commandId": "command-1",
+              "correlationId": "11a3524e-86b3-4428-9f9a-abf51136f1ad"
             }
             """;
 
@@ -61,6 +62,7 @@ public sealed class ImageStoreTests
         Assert.NotNull(image);
         Assert.Equal("edge-01", image.DeviceId);
         Assert.Equal("command-1", image.CommandId);
+        Assert.Equal(Guid.Parse("11a3524e-86b3-4428-9f9a-abf51136f1ad"), image.CorrelationId);
     }
 
     private static DeviceImage CreateImage(string id, string deviceId, int minute) =>
@@ -76,6 +78,7 @@ public sealed class ImageStoreTests
             CapturedAt = new DateTimeOffset(2026, 9, 23, 12, minute, 0, TimeSpan.Zero),
             UploadedAt = new DateTimeOffset(2026, 9, 23, 12, minute, 5, TimeSpan.Zero),
             Width = 640,
-            Height = 480
+            Height = 480,
+            CorrelationId = Guid.Parse("11a3524e-86b3-4428-9f9a-abf51136f1ad")
         };
 }

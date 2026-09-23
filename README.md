@@ -22,9 +22,10 @@ Build out an application showing remote management of a device at the edge using
 The optional image pipeline extends the heartbeat monitor without changing its
 default deployment:
 
-1. `camera-capture` receives a `TakePicture` JSON command from the
-   `take-picture` Service Bus queue, captures `/dev/video0`, and writes the JPEG
-   plus a recovery manifest to the shared edge volume.
+1. The cloud UI sends a GUID-correlated `TakePicture` command for the selected
+   device through a session-enabled Service Bus queue. `camera-capture` receives
+   only its device session, captures `/dev/video0`, and writes the JPEG plus a
+   recovery manifest to the shared edge volume.
 2. It publishes a QoS 1 `SendImage` event to the local Mosquitto router.
 3. `image-uploader` uploads pending manifests to the private `device-images`
    blob container. Connectivity is checked every five seconds; five failures
@@ -33,8 +34,8 @@ default deployment:
 4. After upload, it publishes `ImageUpload` to Service Bus and removes the
    local image and manifest.
 5. The existing cloud heartbeat monitor consumes `ImageUpload`. Selecting a
-   device shows its images as tiles; selecting a tile opens the full image and
-   capture metadata.
+   device can trigger a capture, inspect correlated request status in a
+   collapsible panel, browse image tiles, and open the full image metadata.
 
 Set `imagePipeline.enabled=true` in the remote chart and
 `telemetryApi.imageServiceBus.enabled=true` in the cloud chart after applying

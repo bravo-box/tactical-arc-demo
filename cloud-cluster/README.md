@@ -26,6 +26,7 @@ helm upgrade --install cloud-cluster ./cloud-cluster/helm/cloud-cluster \
   --namespace tactical-arc \
   --set telemetryApi.imageServiceBus.enabled=true \
   --set telemetryApi.imageServiceBus.fullyQualifiedNamespace="<namespace>.servicebus.usgovcloudapi.net" \
+  --set telemetryApi.cameraCommands.fullyQualifiedNamespace="<namespace>.servicebus.usgovcloudapi.net" \
   --set telemetryApi.storage.accountUrl="https://<account>.blob.core.usgovcloudapi.net" \
   --set telemetryApi.workloadIdentity.clientId="<terraform workload_identity_client_id>"
 ```
@@ -33,3 +34,8 @@ helm upgrade --install cloud-cluster ./cloud-cluster/helm/cloud-cluster \
 For a local/demo namespace, set the image Service Bus and storage
 `existingSecret` values instead. Each secret must contain a `connection-string`
 key.
+
+The selected device name is sent as the Service Bus session ID, so it must
+match `cameraCapture.config.deviceId` on the edge device. The UI assigns a GUID
+correlation ID to each request and shows it as `Queued` until the matching
+`ImageUpload` event marks it `Uploaded`.

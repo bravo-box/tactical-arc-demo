@@ -13,7 +13,7 @@ from typing import Any
 import cv2
 import paho.mqtt.client as mqtt
 from azure.identity import DefaultAzureCredential
-from azure.servicebus import ServiceBusClient, ServiceBusMessage
+from azure.servicebus import ServiceBusClient
 
 CONFIG_PATH = Path(os.environ.get("CAMERA_CONFIG", "/etc/camera-capture/config.json"))
 SERVICEBUS_CONNECTION_STRING = "SERVICEBUS_CONNECTION_STRING"
@@ -59,7 +59,7 @@ def namespace_connection_string(connection_string: str) -> str:
     )
 
 
-def parse_take_picture(body: str) -> dict[str, Any] | None:
+def parse_take_picture(body: str, device_id: str | None = None) -> dict[str, Any] | None:
     try:
         event = json.loads(body)
     except json.JSONDecodeError:
@@ -67,7 +67,15 @@ def parse_take_picture(body: str) -> dict[str, Any] | None:
     if not isinstance(event, dict):
         return None
     command = event.get("type") or event.get("command")
-    return event if command == "TakePicture" else None
+    if command != "TakePicture":
+        return None
+    if device_id is not None and event.get("deviceId") != device_id:
+        return None
+    try:
+        uuid.UUID(event["correlationId"])
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return None
+    return event
 
 
 def capture_image(camera_index: int, target: Path) -> tuple[int, int]:
@@ -110,6 +118,7 @@ def build_metadata(
         "width": width,
         "height": height,
         "commandId": command.get("id"),
+        "correlationId": command["correlationId"],
     }
 
 
@@ -163,11 +172,12 @@ def main() -> None:
     try:
         with service_bus, service_bus.get_queue_receiver(
             queue_name=config["serviceBusQueue"],
+            session_id=config["deviceId"],
             max_wait_time=5,
         ) as receiver:
             while True:
                 for message in receiver.receive_messages(max_message_count=1, max_wait_time=5):
-                    command = parse_take_picture(str(message))
+                    command = parse_take_picture(str(message), config["deviceId"])
                     if command is None:
                         print("dead-lettering unsupported camera command", flush=True)
                         receiver.dead_letter_message(message, reason="UnsupportedCommand")

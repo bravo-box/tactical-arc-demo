@@ -53,6 +53,10 @@ spec:
               value: {{ .Values.telemetryApi.imageServiceBus.subscription | quote }}
             - name: ImageServiceBus__FullyQualifiedNamespace
               value: {{ .Values.telemetryApi.imageServiceBus.fullyQualifiedNamespace | quote }}
+            - name: CameraCommands__Queue
+              value: {{ .Values.telemetryApi.cameraCommands.queue | quote }}
+            - name: CameraCommands__FullyQualifiedNamespace
+              value: {{ .Values.telemetryApi.cameraCommands.fullyQualifiedNamespace | quote }}
             - name: Storage__Container
               value: {{ .Values.telemetryApi.storage.container | quote }}
             - name: Storage__AccountUrl
@@ -81,6 +85,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.telemetryApi.storage.existingSecret }}
                   key: {{ .Values.telemetryApi.storage.connectionStringKey }}
+            {{- end }}
+            {{- if .Values.telemetryApi.cameraCommands.existingSecret }}
+            - name: CameraCommands__ConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetryApi.cameraCommands.existingSecret }}
+                  key: {{ .Values.telemetryApi.cameraCommands.connectionStringKey }}
             {{- end }}
           livenessProbe:
             httpGet:

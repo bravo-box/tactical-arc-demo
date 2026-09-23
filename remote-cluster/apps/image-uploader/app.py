@@ -156,6 +156,7 @@ class ImageUploader:
                     "width": str(metadata["width"]),
                     "height": str(metadata["height"]),
                     "commandid": str(metadata.get("commandId") or ""),
+                    "correlationid": metadata["correlationId"],
                 },
             )
         uploaded = {
@@ -171,8 +172,12 @@ class ImageUploader:
                     json.dumps(uploaded, separators=(",", ":")),
                     content_type="application/json",
                     message_id=metadata["id"],
+                    correlation_id=metadata["correlationId"],
                     subject="ImageUpload",
-                    application_properties={"deviceId": metadata["deviceId"]},
+                    application_properties={
+                        "deviceId": metadata["deviceId"],
+                        "correlationId": metadata["correlationId"],
+                    },
                 )
             )
         image_path.unlink(missing_ok=True)
