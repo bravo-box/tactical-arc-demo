@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Shared image build helper used by the per-section build scripts.
 #
-# Usage: build-images.sh --apps-dir <dir> [--registry <acr-login-server>] [--tag <tag>] [--push]
+# Usage: build-images.sh --apps-dir <dir> [--registry <acr>] [--tag <tag>] [--platform <platforms>] [--push]
 set -euo pipefail
 
 APPS_DIR=""
 REGISTRY=""
 TAG="0.1.0"
 PUSH="false"
+PLATFORMS=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -26,6 +27,10 @@ while [[ $# -gt 0 ]]; do
   --push)
     PUSH="true"
     shift
+    ;;
+  --platform)
+    PLATFORMS="$2"
+    shift 2
     ;;
   -h | --help)
     sed -n '2,4p' "${BASH_SOURCE[0]}"
@@ -56,10 +61,23 @@ for app_dir in "${APPS_DIR%/}"/*/; do
     image="${REGISTRY%/}/${image}"
   fi
 
-  echo "Building ${image}"
-  docker build -t "${image}" "${app_dir}"
-
-  if [ "${PUSH}" = "true" ]; then
-    docker push "${image}"
+  if [ -n "${PLATFORMS}" ]; then
+    build_args=(--platform "${PLATFORMS}" --tag "${image}")
+    if [ "${PUSH}" = "true" ]; then
+      build_args+=(--push)
+    elif [[ "${PLATFORMS}" == *,* ]]; then
+      echo "A multi-platform build must use --push." >&2
+      exit 1
+    else
+      build_args+=(--load)
+    fi
+    echo "Building ${image} for ${PLATFORMS}"
+    docker buildx build "${build_args[@]}" "${app_dir}"
+  else
+    echo "Building ${image}"
+    docker build -t "${image}" "${app_dir}"
+    if [ "${PUSH}" = "true" ]; then
+      docker push "${image}"
+    fi
   fi
 done

@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Stand up a single-node Kubernetes (K3s) cluster on an edge device and
-# configure Docker so that images can be built locally.
+# Stand up a single-node Kubernetes (K3s) cluster on a Jetson Nano,
+# Raspberry Pi, or other Debian/Ubuntu edge device.
 #
 # Run this on the edge device itself:
-#   sudo ./install-kubernetes.sh [--k3s-version <version>] [--skip-docker]
+#   sudo ./install-kubernetes.sh [--k3s-version <version>] [--skip-docker] [--skip-helm]
 set -euo pipefail
 
 K3S_VERSION=""
 INSTALL_DOCKER="true"
+INSTALL_HELM="true"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -17,6 +18,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   --skip-docker)
     INSTALL_DOCKER="false"
+    shift
+    ;;
+  --skip-helm)
+    INSTALL_HELM="false"
     shift
     ;;
   -h | --help)
@@ -35,14 +40,21 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
+case "$(uname -m)" in
+aarch64 | arm64 | armv7l | x86_64) ;;
+*)
+  echo "Unsupported architecture '$(uname -m)'; expected arm64, armv7, or x86_64." >&2
+  exit 1
+  ;;
+esac
+
 install_docker() {
   if command -v docker >/dev/null 2>&1; then
     echo "Docker already installed: $(docker --version)"
   else
-    echo "Installing Docker Engine from the signed Docker apt repository..."
+    echo "Installing Docker Engine..."
     apt-get update
     apt-get install -y --no-install-recommends ca-certificates curl gnupg
-    install -m 0755 -d /usr/share/keyrings
     # shellcheck disable=SC1091
     . /etc/os-release
     local distro="${ID:-}" codename="${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
@@ -58,14 +70,21 @@ install_docker() {
       echo "Could not determine the distribution codename from /etc/os-release." >&2
       exit 1
     fi
-    curl -fsSL "https://download.docker.com/linux/${distro}/gpg" |
-      gpg --batch --yes --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-    chmod a+r /usr/share/keyrings/docker-archive-keyring.gpg
-    printf 'deb [arch=%s signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/%s %s stable\n' \
-      "$(dpkg --print-architecture)" "${distro}" "${codename}" \
-      >/etc/apt/sources.list.d/docker.list
-    apt-get update
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+
+    if [ -f /etc/nv_tegra_release ]; then
+      echo "NVIDIA Jetson detected; using the distribution Docker package for JetPack compatibility."
+      apt-get install -y docker.io
+    else
+      install -m 0755 -d /usr/share/keyrings
+      curl -fsSL "https://download.docker.com/linux/${distro}/gpg" |
+        gpg --batch --yes --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+      chmod a+r /usr/share/keyrings/docker-archive-keyring.gpg
+      printf 'deb [arch=%s signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/%s %s stable\n' \
+        "$(dpkg --print-architecture)" "${distro}" "${codename}" \
+        >/etc/apt/sources.list.d/docker.list
+      apt-get update
+      apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+    fi
   fi
 
   # Configure the daemon for edge use: bounded log files and live restore so
@@ -93,6 +112,21 @@ JSON
     usermod -aG docker "${SUDO_USER}"
     echo "Added ${SUDO_USER} to the docker group (re-login required)."
   fi
+}
+
+install_helm() {
+  if command -v helm >/dev/null 2>&1; then
+    echo "Helm already installed: $(helm version --short)"
+    return
+  fi
+
+  echo "Installing Helm..."
+  local installer
+  installer="$(mktemp)"
+  curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o "${installer}"
+  chmod 0700 "${installer}"
+  "${installer}"
+  rm -f "${installer}"
 }
 
 install_k3s() {
@@ -131,6 +165,9 @@ if [ "${INSTALL_DOCKER}" = "true" ]; then
   install_docker
 fi
 install_k3s
+if [ "${INSTALL_HELM}" = "true" ]; then
+  install_helm
+fi
 configure_kubeconfig
 
 echo "Waiting for the node to become ready..."

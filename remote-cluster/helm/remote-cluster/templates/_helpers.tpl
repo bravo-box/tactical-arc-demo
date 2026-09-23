@@ -19,7 +19,7 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" }}
 
 {{- define "remote-cluster.image" -}}
 {{- $registry := .Values.imageRegistry | trimSuffix "/" -}}
-{{- $image := printf "%s:%s" .Values.edgeAgent.image.repository .Values.edgeAgent.image.tag -}}
+{{- $image := printf "%s:%s" .Values.edgeHeartbeat.image.repository .Values.edgeHeartbeat.image.tag -}}
 {{- if $registry -}}
 {{- printf "%s/%s" $registry $image -}}
 {{- else -}}

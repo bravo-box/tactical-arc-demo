@@ -1,21 +1,24 @@
-edgeAgent:
+edgeHeartbeat:
   replicaCount: 1
   image:
-    repository: edge-agent
+    repository: edge-heartbeat
     tag: "0.1.0"
     pullPolicy: IfNotPresent
-  # Placeholder: must be overridden with the URL of the cloud telemetry API as
-  # reachable from the edge device (see scripts/deploy.sh --telemetry-url).
-  telemetryUrl: http://telemetry-api.example.invalid:8080/telemetry
-  deviceId: ""
-  intervalSeconds: 30
+  serviceBus:
+    existingSecret: edge-heartbeat-servicebus
+  config: |
+    {
+      "deviceId": "",
+      "heartbeatIntervalSeconds": 5,
+      "serviceBusTopic": "edge-heartbeat"
+    }
   resources:
     requests:
       cpu: 25m
-      memory: 32Mi
+      memory: 64Mi
     limits:
       cpu: 250m
-      memory: 128Mi
+      memory: 192Mi
 
 imageRegistry: ""
 imagePullSecrets: []
