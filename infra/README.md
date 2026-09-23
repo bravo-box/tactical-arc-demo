@@ -7,17 +7,16 @@ Government:
   Entra-authenticated point-to-site VPN, optional edge site-to-site VPN, and
   WAF_v2 Application Gateway.
 - `az-tactical-demo-cloud`: private AKS, Premium private ACR, Premium private
-  Service Bus, private image Blob Storage, workload identity, Log Analytics,
-  and Application Insights.
+  Service Bus, private image Blob Storage, Cosmos DB for NoSQL, workload
+  identity, Log Analytics, and Application Insights.
 - `az-tactical-demo-edge`: landing resource group for Arc-managed edge
   resources created during device onboarding.
 
 Application traffic enters through Application Gateway. The AKS Application
-Gateway ingress add-on manages its backend configuration. ACR and Service Bus
-and image storage disable public access and use Azure Government private DNS
-zones. AKS uses
-managed identity for image pulls and a federated workload identity for Service
-Bus access.
+Gateway ingress add-on manages its backend configuration. ACR, Service Bus, image storage, and Cosmos DB disable public access and use
+Azure Government private DNS zones. AKS uses managed identity for image pulls
+and a federated workload identity for Service Bus, Blob Storage, and Cosmos DB
+data-plane access.
 
 ## Prerequisites
 
@@ -64,13 +63,19 @@ blobs. The AKS workload identity receives upload events and reads blobs.
 The command queue requires sessions so the cloud monitor can target the
 selected device by using its device name as the session ID.
 
+Cosmos DB stores one JSON document per device in the `telemetry/devices`
+container, partitioned by `/deviceId`. Each document contains bounded heartbeat
+and image-metadata histories plus the latest location and device specs. Image
+bytes remain in Blob Storage. Local Cosmos keys are disabled, and the workload
+identity receives only the built-in Cosmos DB data contributor role.
+
 ## AKS workload identity
 
-Configure the cloud Helm chart to use namespace `tactical-demo` and service
+Configure the cloud Helm chart to use namespace `tactical-arc` and service
 account `telemetry-api`, annotate the service account with the
 `workload_identity_client_id` output, and add the label
 `azure.workload.identity/use: "true"` to the pod template. The application
-should authenticate with `DefaultAzureCredential`; no Service Bus connection
+authenticates with `DefaultAzureCredential`; no Cosmos DB key or connection
 string is created.
 
 ## Remote state

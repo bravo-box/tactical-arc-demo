@@ -99,10 +99,16 @@ public sealed class ServiceBusImageConsumer : IHostedService, IAsyncDisposable
             return;
         }
 
-        var validationError = image is null ? "message body is empty" : string.Empty;
-        if (image is null || !_store.TryAdd(image, out validationError))
+        if (image is null)
         {
-            await DeadLetterAsync(args, "InvalidImageUpload", validationError);
+            await DeadLetterAsync(args, "InvalidImageUpload", "message body is empty");
+            return;
+        }
+
+        var result = await _store.TryAddAsync(image, args.CancellationToken);
+        if (!result.Accepted)
+        {
+            await DeadLetterAsync(args, "InvalidImageUpload", result.ValidationError);
             return;
         }
 

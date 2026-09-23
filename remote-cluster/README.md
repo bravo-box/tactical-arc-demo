@@ -89,13 +89,22 @@ device information to include in heartbeats and image metadata:
   "manufacturer": "Example",
   "model": "Edge Device",
   "serialNumber": "replace-me",
-  "location": "replace-me"
+  "architecture": "arm64",
+  "location": {
+    "latitude": 38.8977,
+    "longitude": -77.0365
+  }
 }
 ```
 
 The deploy script mounts this file directly from the device filesystem as a
 read-only `hostPath`. Pass `--device-config /absolute/path/device-info.json`
 to use another location.
+
+The cloud application preserves the full `deviceInfo` object in the device's
+single Cosmos DB document. A `location` object with numeric `latitude` and
+`longitude` becomes the document location, while the other device information
+fields are also represented in the document's specs array.
 
 Then build a multi-architecture image and deploy the local chart:
 

@@ -120,6 +120,58 @@ resource "azurerm_user_assigned_identity" "workload" {
   tags                = var.tags
 }
 
+resource "azurerm_cosmosdb_account" "devices" {
+  name                          = "cosmos-${var.name_prefix}-${var.unique_suffix}"
+  location                      = azurerm_resource_group.this.location
+  resource_group_name           = azurerm_resource_group.this.name
+  offer_type                    = "Standard"
+  kind                          = "GlobalDocumentDB"
+  public_network_access_enabled = false
+  local_authentication_enabled  = false
+  tags                          = var.tags
+
+  consistency_policy {
+    consistency_level = "Session"
+  }
+
+  geo_location {
+    location          = azurerm_resource_group.this.location
+    failover_priority = 0
+  }
+}
+
+resource "azurerm_cosmosdb_sql_database" "devices" {
+  name                = "telemetry"
+  resource_group_name = azurerm_resource_group.this.name
+  account_name        = azurerm_cosmosdb_account.devices.name
+}
+
+resource "azurerm_cosmosdb_sql_container" "devices" {
+  name                  = "devices"
+  resource_group_name   = azurerm_resource_group.this.name
+  account_name          = azurerm_cosmosdb_account.devices.name
+  database_name         = azurerm_cosmosdb_sql_database.devices.name
+  partition_key_paths   = ["/deviceId"]
+  partition_key_version = 2
+  throughput            = 400
+
+  indexing_policy {
+    indexing_mode = "consistent"
+
+    included_path {
+      path = "/*"
+    }
+  }
+}
+
+resource "azurerm_cosmosdb_sql_role_assignment" "workload_data_contributor" {
+  resource_group_name = azurerm_resource_group.this.name
+  account_name        = azurerm_cosmosdb_account.devices.name
+  role_definition_id  = "${azurerm_cosmosdb_account.devices.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
+  principal_id        = azurerm_user_assigned_identity.workload.principal_id
+  scope               = azurerm_cosmosdb_account.devices.id
+}
+
 resource "azurerm_federated_identity_credential" "workload" {
   name                = "fic-${var.name_prefix}-telemetry"
   resource_group_name = azurerm_resource_group.this.name
@@ -165,6 +217,27 @@ resource "azurerm_monitor_diagnostic_setting" "acr" {
 
   dynamic "enabled_log" {
     for_each = data.azurerm_monitor_diagnostic_categories.acr.log_category_types
+    content {
+      category = enabled_log.value
+    }
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
+  }
+}
+
+data "azurerm_monitor_diagnostic_categories" "cosmos" {
+  resource_id = azurerm_cosmosdb_account.devices.id
+}
+
+resource "azurerm_monitor_diagnostic_setting" "cosmos" {
+  name                       = "diag-cosmos"
+  target_resource_id         = azurerm_cosmosdb_account.devices.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+
+  dynamic "enabled_log" {
+    for_each = data.azurerm_monitor_diagnostic_categories.cosmos.log_category_types
     content {
       category = enabled_log.value
     }
