@@ -28,6 +28,21 @@ resource "azurerm_servicebus_queue" "telemetry" {
   default_message_ttl                     = "P7D"
 }
 
+resource "azurerm_servicebus_topic" "edge_heartbeat" {
+  name                                    = "edge-heartbeat"
+  namespace_id                            = azurerm_servicebus_namespace.this.id
+  default_message_ttl                     = "P1D"
+  duplicate_detection_history_time_window = "PT10M"
+  requires_duplicate_detection            = true
+}
+
+resource "azurerm_servicebus_subscription" "heartbeat_monitor" {
+  name               = "heartbeat-monitor"
+  topic_id           = azurerm_servicebus_topic.edge_heartbeat.id
+  lock_duration      = "PT1M"
+  max_delivery_count = 10
+}
+
 resource "azurerm_role_assignment" "workload_sender" {
   scope                = azurerm_servicebus_queue.telemetry.id
   role_definition_name = "Azure Service Bus Data Sender"
@@ -43,7 +58,7 @@ resource "azurerm_role_assignment" "workload_receiver" {
 resource "azurerm_role_assignment" "edge_sender" {
   count = var.edge_arc_principal_id == null ? 0 : 1
 
-  scope                = azurerm_servicebus_queue.telemetry.id
+  scope                = azurerm_servicebus_topic.edge_heartbeat.id
   role_definition_name = "Azure Service Bus Data Sender"
   principal_id         = var.edge_arc_principal_id
 }

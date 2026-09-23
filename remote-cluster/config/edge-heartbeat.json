@@ -1,0 +1,5 @@
+{
+  "deviceId": "",
+  "heartbeatIntervalSeconds": 5,
+  "serviceBusTopic": "edge-heartbeat"
+}

@@ -52,7 +52,8 @@ laptops. Set `edge_vpn_enabled = true`, `edge_gateway_address`, and
 
 After onboarding an edge device to Azure Arc, set
 `edge_arc_principal_id` to its managed identity principal ID to grant it
-`Azure Service Bus Data Sender` on the telemetry queue.
+`Azure Service Bus Data Sender` on the `edge-heartbeat` topic. The topic also
+has a `heartbeat-monitor` subscription for heartbeat consumers.
 
 ## AKS workload identity
 

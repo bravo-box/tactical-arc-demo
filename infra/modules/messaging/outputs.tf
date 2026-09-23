@@ -9,3 +9,11 @@ output "servicebus_namespace_name" {
 output "servicebus_fully_qualified_namespace" {
   value = "${azurerm_servicebus_namespace.this.name}.servicebus.usgovcloudapi.net"
 }
+
+output "edge_heartbeat_topic_name" {
+  value = azurerm_servicebus_topic.edge_heartbeat.name
+}
+
+output "heartbeat_monitor_subscription_name" {
+  value = azurerm_servicebus_subscription.heartbeat_monitor.name
+}

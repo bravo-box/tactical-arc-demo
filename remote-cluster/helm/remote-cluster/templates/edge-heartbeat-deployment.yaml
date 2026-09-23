@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "remote-cluster.fullname" . }}-edge-heartbeat
+  labels:
+    {{- include "remote-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/component: edge-heartbeat
+spec:
+  replicas: {{ .Values.edgeHeartbeat.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "remote-cluster.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: edge-heartbeat
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ .Values.edgeHeartbeat.config | sha256sum }}
+      labels:
+        {{- include "remote-cluster.labels" . | nindent 8 }}
+        app.kubernetes.io/component: edge-heartbeat
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: edge-heartbeat
+          image: {{ include "remote-cluster.image" . }}
+          imagePullPolicy: {{ .Values.edgeHeartbeat.image.pullPolicy }}
+          env:
+            - name: SERVICEBUS_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.edgeHeartbeat.serviceBus.existingSecret }}
+                  key: connection-string
+          volumeMounts:
+            - name: config
+              mountPath: /etc/edge-heartbeat
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.edgeHeartbeat.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "remote-cluster.fullname" . }}-edge-heartbeat

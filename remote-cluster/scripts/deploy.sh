@@ -1,21 +1,35 @@
 #!/usr/bin/env bash
-# Deploy the edge Helm chart onto the edge Kubernetes cluster.
+# Install or upgrade edge-heartbeat from a local, repository, URL, or OCI Helm chart.
 #
-# Usage: deploy.sh --telemetry-url <url> [--registry <acr>] [--release <name>] [--namespace <ns>]
+# Usage: deploy.sh [--chart <chart-ref>] [--config <file>] [--connection-string-file <file>]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CHART_DIR="${SCRIPT_DIR}/../helm/remote-cluster"
-
-TELEMETRY_URL=""
+CHART="${SCRIPT_DIR}/../helm/remote-cluster"
+CONFIG_FILE="${SCRIPT_DIR}/../config/edge-heartbeat.json"
+CONNECTION_STRING_FILE="${SCRIPT_DIR}/../.secrets/servicebus-connection-string"
 REGISTRY=""
 RELEASE="remote-cluster"
 NAMESPACE="tactical-arc"
+CHART_VERSION=""
+SECRET_NAME="edge-heartbeat-servicebus"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  --telemetry-url)
-    TELEMETRY_URL="$2"
+  --chart)
+    CHART="$2"
+    shift 2
+    ;;
+  --chart-version)
+    CHART_VERSION="$2"
+    shift 2
+    ;;
+  --config)
+    CONFIG_FILE="$2"
+    shift 2
+    ;;
+  --connection-string-file)
+    CONNECTION_STRING_FILE="$2"
     shift 2
     ;;
   --registry)
@@ -41,17 +55,47 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [ -z "${TELEMETRY_URL}" ]; then
-  echo "--telemetry-url is required (the chart default is a placeholder)" >&2
+for command in helm kubectl; do
+  if ! command -v "${command}" >/dev/null 2>&1; then
+    echo "Required command not found: ${command}" >&2
+    exit 1
+  fi
+done
+if [ ! -r "${CONFIG_FILE}" ]; then
+  echo "Heartbeat configuration is not readable: ${CONFIG_FILE}" >&2
+  exit 1
+fi
+if [ ! -r "${CONNECTION_STRING_FILE}" ] || [ ! -s "${CONNECTION_STRING_FILE}" ]; then
+  echo "Service Bus credential is missing or empty: ${CONNECTION_STRING_FILE}" >&2
+  echo "Run configure-service-bus.sh first or pass --connection-string-file." >&2
   exit 1
 fi
 
-helm_args=(--namespace "${NAMESPACE}" --create-namespace --wait)
+kubectl create namespace "${NAMESPACE}" --dry-run=client --output yaml | kubectl apply -f -
+kubectl create secret generic "${SECRET_NAME}" \
+  --namespace "${NAMESPACE}" \
+  --from-file="connection-string=${CONNECTION_STRING_FILE}" \
+  --dry-run=client \
+  --output yaml |
+  kubectl apply -f -
+
+helm_args=(
+  --namespace "${NAMESPACE}"
+  --create-namespace
+  --wait
+  --set-file "edgeHeartbeat.config=${CONFIG_FILE}"
+  --set "edgeHeartbeat.serviceBus.existingSecret=${SECRET_NAME}"
+)
 if [ -n "${REGISTRY}" ]; then
   helm_args+=(--set "imageRegistry=${REGISTRY}")
 fi
-if [ -n "${TELEMETRY_URL}" ]; then
-  helm_args+=(--set "edgeAgent.telemetryUrl=${TELEMETRY_URL}")
+if [ -n "${CHART_VERSION}" ]; then
+  helm_args+=(--version "${CHART_VERSION}")
 fi
 
-helm upgrade --install "${RELEASE}" "${CHART_DIR}" "${helm_args[@]}"
+helm upgrade --install "${RELEASE}" "${CHART}" "${helm_args[@]}"
+kubectl rollout status \
+  --namespace "${NAMESPACE}" \
+  deployment \
+  --selector "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=edge-heartbeat" \
+  --timeout=180s

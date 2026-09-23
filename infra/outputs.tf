@@ -48,6 +48,16 @@ output "servicebus_fully_qualified_namespace" {
   value       = module.messaging.servicebus_fully_qualified_namespace
 }
 
+output "edge_heartbeat_topic_name" {
+  description = "Service Bus topic receiving edge device heartbeat messages."
+  value       = module.messaging.edge_heartbeat_topic_name
+}
+
+output "heartbeat_monitor_subscription_name" {
+  description = "Service Bus subscription used to consume edge heartbeat messages."
+  value       = module.messaging.heartbeat_monitor_subscription_name
+}
+
 output "workload_identity_client_id" {
   description = "Client ID to annotate on the telemetry Kubernetes service account."
   value       = module.cloud.workload_identity_client_id
