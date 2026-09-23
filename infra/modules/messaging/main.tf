@@ -50,7 +50,7 @@ resource "azurerm_role_assignment" "workload_sender" {
 }
 
 resource "azurerm_role_assignment" "workload_receiver" {
-  scope                = azurerm_servicebus_queue.telemetry.id
+  scope                = azurerm_servicebus_subscription.heartbeat_monitor.id
   role_definition_name = "Azure Service Bus Data Receiver"
   principal_id         = var.workload_identity_principal
 }

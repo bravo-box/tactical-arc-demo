@@ -9,13 +9,14 @@ import app
 
 
 class EdgeHeartbeatTests(unittest.TestCase):
-    def test_load_config_uses_hostname_when_device_id_is_empty(self) -> None:
+    def test_load_config_reads_device_name_and_health(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "config.json"
             path.write_text(
                 json.dumps(
                     {
-                        "deviceId": "",
+                        "device-name": "edge-01",
+                        "healthStatus": "Green",
                         "heartbeatIntervalSeconds": 5,
                         "serviceBusTopic": "edge-heartbeat",
                     }
@@ -25,7 +26,8 @@ class EdgeHeartbeatTests(unittest.TestCase):
 
             config = app.load_config(path)
 
-        self.assertTrue(config["deviceId"])
+        self.assertEqual(config["device-name"], "edge-01")
+        self.assertEqual(config["healthStatus"], "Green")
         self.assertEqual(config["heartbeatIntervalSeconds"], 5.0)
         self.assertEqual(config["serviceBusTopic"], "edge-heartbeat")
 
@@ -45,14 +47,33 @@ class EdgeHeartbeatTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "positive number"):
                 app.load_config(path)
 
+    def test_load_config_rejects_unknown_health_status(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "device-name": "edge-01",
+                        "healthStatus": "Unknown",
+                        "heartbeatIntervalSeconds": 5,
+                        "serviceBusTopic": "edge-heartbeat",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "Green, Yellow, or Red"):
+                app.load_config(path)
+
     def test_build_heartbeat_includes_device_metadata(self) -> None:
-        heartbeat = app.build_heartbeat("edge-01")
+        heartbeat = app.build_heartbeat("edge-01", "Green")
 
         self.assertEqual(heartbeat["type"], "edge-heartbeat")
-        self.assertEqual(heartbeat["deviceId"], "edge-01")
+        self.assertEqual(heartbeat["device-name"], "edge-01")
+        self.assertEqual(heartbeat["healthStatus"], "Green")
+        self.assertTrue(heartbeat["ipAddress"])
         self.assertTrue(heartbeat["id"])
         self.assertTrue(heartbeat["timestamp"])
-        self.assertTrue(heartbeat["architecture"])
 
     def test_namespace_connection_string_removes_entity_path(self) -> None:
         connection_string = (

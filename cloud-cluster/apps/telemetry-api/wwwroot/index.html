@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Device heartbeat monitor</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background: #0b1220; color: #e5edf8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; }
+    header { padding: 20px 24px; border-bottom: 1px solid #243249; background: #111b2d; }
+    header h1 { margin: 0; font-size: 1.25rem; }
+    main { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; min-height: calc(100vh - 65px); }
+    aside { border-right: 1px solid #243249; padding: 16px; }
+    #devices { display: grid; gap: 8px; }
+    button { width: 100%; border: 1px solid #30415e; border-radius: 8px; padding: 12px; color: inherit; background: #162238; text-align: left; cursor: pointer; }
+    button:hover, button.selected { border-color: #60a5fa; background: #1d3150; }
+    .device-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+    .active { background: #34d399; }
+    .inactive { background: #64748b; }
+    section { padding: 24px; overflow: auto; }
+    .details { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .card { border: 1px solid #243249; border-radius: 10px; padding: 14px; background: #111b2d; }
+    .label { color: #93a4bc; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+    .value { margin-top: 6px; font-weight: 650; overflow-wrap: anywhere; }
+    .status-Green { color: #34d399; } .status-Yellow { color: #fbbf24; } .status-Red { color: #fb7185; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px; border-bottom: 1px solid #243249; text-align: left; }
+    th { color: #93a4bc; font-size: .75rem; text-transform: uppercase; }
+    .empty { color: #93a4bc; padding: 28px 0; }
+    @media (max-width: 760px) {
+      main { grid-template-columns: 1fr; }
+      aside { border-right: 0; border-bottom: 1px solid #243249; }
+      .details { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <header><h1>Device heartbeat monitor</h1></header>
+  <main>
+    <aside><div id="devices"><div class="empty">Waiting for devices...</div></div></aside>
+    <section id="content"><div class="empty">Select a device to see its heartbeat history.</div></section>
+  </main>
+  <script>
+    const devicesElement = document.querySelector("#devices");
+    const contentElement = document.querySelector("#content");
+    let selectedDevice = null;
+
+    const escapeHtml = value => String(value).replace(/[&<>"']/g, char => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]
+    ));
+    const formatDate = value => new Date(value).toLocaleString();
+
+    async function refreshDevices() {
+      const response = await fetch("/api/devices");
+      if (!response.ok) throw new Error("Unable to load devices");
+      const devices = await response.json();
+      devicesElement.innerHTML = devices.length ? devices.map(device => `
+        <button data-device="${escapeHtml(device.deviceName)}" class="${device.deviceName === selectedDevice ? "selected" : ""}">
+          <div class="device-row">
+            <span><span class="dot ${device.isActive ? "active" : "inactive"}"></span>${escapeHtml(device.deviceName)}</span>
+            <span class="status-${device.healthStatus}">${escapeHtml(device.healthStatus)}</span>
+          </div>
+        </button>`).join("") : '<div class="empty">Waiting for devices...</div>';
+      document.querySelectorAll("[data-device]").forEach(button =>
+        button.addEventListener("click", () => selectDevice(button.dataset.device)));
+      if (selectedDevice) await loadDetails(selectedDevice);
+    }
+
+    async function selectDevice(deviceName) {
+      selectedDevice = deviceName;
+      await refreshDevices();
+    }
+
+    async function loadDetails(deviceName) {
+      const response = await fetch(`/api/devices/${encodeURIComponent(deviceName)}`);
+      if (!response.ok) return;
+      const device = await response.json();
+      contentElement.innerHTML = `
+        <div class="details">
+          <div class="card"><div class="label">Device</div><div class="value">${escapeHtml(device.deviceName)}</div></div>
+          <div class="card"><div class="label">IP address</div><div class="value">${escapeHtml(device.ipAddress)}</div></div>
+          <div class="card"><div class="label">Health</div><div class="value status-${device.healthStatus}">${escapeHtml(device.healthStatus)}</div></div>
+          <div class="card"><div class="label">Last seen</div><div class="value">${formatDate(device.lastSeen)}</div></div>
+        </div>
+        <h2>Heartbeat log</h2>
+        <table><thead><tr><th>Received</th><th>Device timestamp</th><th>IP address</th><th>Status</th></tr></thead>
+        <tbody>${device.heartbeats.map(heartbeat => `<tr>
+          <td>${formatDate(heartbeat.receivedAt)}</td><td>${formatDate(heartbeat.timestamp)}</td>
+          <td>${escapeHtml(heartbeat.ipAddress)}</td>
+          <td class="status-${heartbeat.healthStatus}">${escapeHtml(heartbeat.healthStatus)}</td>
+        </tr>`).join("")}</tbody></table>`;
+    }
+
+    refreshDevices().catch(error => contentElement.textContent = error.message);
+    setInterval(() => refreshDevices().catch(console.error), 5000);
+  </script>
+</body>
+</html>

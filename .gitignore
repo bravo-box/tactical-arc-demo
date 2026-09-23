@@ -16,6 +16,10 @@ charts/*.tgz
 __pycache__/
 *.py[cod]
 
+# .NET
+bin/
+obj/
+
 # Local tooling
 .kube/
 .vscode/

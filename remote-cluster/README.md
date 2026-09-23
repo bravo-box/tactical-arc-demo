@@ -69,7 +69,8 @@ Edit the device-local configuration:
 
 ```json
 {
-  "deviceId": "edge-01",
+  "device-name": "edge-01",
+  "healthStatus": "Green",
   "heartbeatIntervalSeconds": 5,
   "serviceBusTopic": "edge-heartbeat"
 }

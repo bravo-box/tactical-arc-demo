@@ -1,0 +1,52 @@
+name: Build and push application images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "cloud-cluster/apps/**"
+      - "remote-cluster/apps/**"
+      - ".github/workflows/build-images.yml"
+  workflow_dispatch:
+    inputs:
+      acr_registry:
+        description: Azure Container Registry login server
+        required: true
+        type: string
+      image_tag:
+        description: Container image tag
+        required: true
+        default: latest
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      ACR_REGISTRY: ${{ inputs.acr_registry || vars.ACR_REGISTRY }}
+      IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
+    strategy:
+      matrix:
+        include:
+          - image: telemetry-api
+            context: cloud-cluster/apps/telemetry-api
+          - image: edge-heartbeat
+            context: remote-cluster/apps/edge-heartbeat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ env.ACR_REGISTRY }}/${{ matrix.image }}:${{ env.IMAGE_TAG }}

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import os
-import platform
 import socket
 import time
 import uuid
@@ -34,25 +33,42 @@ def load_config(path: Path) -> dict[str, Any]:
     if not isinstance(topic, str) or not topic.strip():
         raise ValueError("serviceBusTopic must be a non-empty string")
 
-    device_id = config.get("deviceId") or socket.gethostname()
-    if not isinstance(device_id, str) or not device_id.strip():
-        raise ValueError("deviceId must be a non-empty string")
+    device_name = config.get("device-name")
+    if not isinstance(device_name, str) or not device_name.strip():
+        raise ValueError("device-name must be a non-empty string")
+
+    health_status = config.get("healthStatus", "Green")
+    if health_status not in ("Green", "Yellow", "Red"):
+        raise ValueError("healthStatus must be Green, Yellow, or Red")
 
     return {
-        "deviceId": device_id.strip(),
+        "device-name": device_name.strip(),
+        "healthStatus": health_status,
         "heartbeatIntervalSeconds": float(interval),
         "serviceBusTopic": topic.strip(),
     }
 
 
-def build_heartbeat(device_id: str) -> dict[str, Any]:
+def get_ip_address() -> str:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        try:
+            probe.connect(("8.8.8.8", 80))
+            return str(probe.getsockname()[0])
+        except OSError:
+            try:
+                return socket.gethostbyname(socket.gethostname())
+            except OSError:
+                return "127.0.0.1"
+
+
+def build_heartbeat(device_name: str, health_status: str) -> dict[str, Any]:
     return {
         "id": str(uuid.uuid4()),
         "type": "edge-heartbeat",
-        "deviceId": device_id,
+        "device-name": device_name,
+        "ipAddress": get_ip_address(),
+        "healthStatus": health_status,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "hostname": socket.gethostname(),
-        "architecture": platform.machine(),
     }
 
 
@@ -81,21 +97,22 @@ def main() -> None:
     )
     topic = config["serviceBusTopic"]
     interval = config["heartbeatIntervalSeconds"]
-    device_id = config["deviceId"]
+    device_name = config["device-name"]
+    health_status = config["healthStatus"]
     print(
-        f"edge-heartbeat device={device_id} topic={topic} interval={interval:g}s",
+        f"edge-heartbeat device={device_name} topic={topic} interval={interval:g}s",
         flush=True,
     )
 
     with client, client.get_topic_sender(topic_name=topic) as sender:
         while True:
-            heartbeat = build_heartbeat(device_id)
+            heartbeat = build_heartbeat(device_name, health_status)
             message = ServiceBusMessage(
                 json.dumps(heartbeat, separators=(",", ":")),
                 content_type="application/json",
                 message_id=heartbeat["id"],
                 subject="heartbeat",
-                application_properties={"deviceId": device_id},
+                application_properties={"device-name": device_name},
             )
             try:
                 sender.send_messages(message)

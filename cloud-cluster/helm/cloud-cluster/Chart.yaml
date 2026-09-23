@@ -1,6 +1,6 @@
 apiVersion: v2
 name: cloud-cluster
-description: Helm chart deploying the tactical-arc-demo cloud workloads (telemetry API) onto AKS.
+description: Helm chart deploying the tactical-arc-demo heartbeat monitor onto AKS.
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.2.0
+appVersion: "0.2.0"
