@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "remote-cluster.fullname" . }}-location-service
+  labels:
+    {{- include "remote-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/component: location-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "remote-cluster.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: location-service
+  template:
+    metadata:
+      labels:
+        {{- include "remote-cluster.labels" . | nindent 8 }}
+        app.kubernetes.io/component: location-service
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: initialize-location
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              if [ ! -f /location/location.json ]; then
+                cp /initial/location.json /location/location.json
+              fi
+              chown 65532:65532 /location/location.json
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - CHOWN
+          volumeMounts:
+            - name: location
+              mountPath: /location
+            - name: initial-location
+              mountPath: /initial
+              readOnly: true
+      containers:
+        - name: location-service
+          image: {{ if .Values.imageRegistry }}{{ .Values.imageRegistry }}/{{ end }}{{ .Values.locationService.image.repository }}:{{ .Values.locationService.image.tag }}
+          imagePullPolicy: {{ .Values.locationService.image.pullPolicy }}
+          env:
+            - name: MQTT_HOST
+              value: {{ include "remote-cluster.fullname" . }}-mqtt
+            - name: MQTT_PORT
+              value: {{ .Values.mqtt.port | quote }}
+            - name: DEVICE_ID
+              value: {{ .Values.locationService.deviceId | quote }}
+            - name: LOCATION_FILE
+              value: /var/lib/location/location.json
+            - name: LOCATION_COMMAND_QUEUE
+              value: {{ .Values.locationService.serviceBus.queue | quote }}
+            - name: SERVICEBUS_FULLY_QUALIFIED_NAMESPACE
+              value: {{ .Values.locationService.serviceBus.fullyQualifiedNamespace | quote }}
+            {{- if .Values.locationService.serviceBus.existingSecret }}
+            - name: SERVICEBUS_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.locationService.serviceBus.existingSecret }}
+                  key: {{ .Values.locationService.serviceBus.connectionStringKey }}
+            {{- end }}
+          volumeMounts:
+            - name: location
+              mountPath: /var/lib/location
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.locationService.resources | nindent 12 }}
+      volumes:
+        - name: location
+          hostPath:
+            path: {{ required "locationService.locationHostPath is required" .Values.locationService.locationHostPath }}
+            type: DirectoryOrCreate
+        - name: initial-location
+          configMap:
+            name: {{ include "remote-cluster.fullname" . }}-initial-location
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "remote-cluster.fullname" . }}-initial-location
+  labels:
+    {{- include "remote-cluster.labels" . | nindent 4 }}
+data:
+  location.json: |
+    {{- .Values.locationService.initialLocation | toJson | nindent 4 }}

@@ -22,6 +22,8 @@ public sealed class HeartbeatStoreTests
         Assert.Equal(2, device.Heartbeats.Count);
         Assert.True(device.IsActive);
         Assert.Equal("Jetson Nano", device.DeviceInfo["model"].GetString());
+        Assert.Equal(47.61, device.Location?.Latitude);
+        Assert.Equal(-122.33, device.Location?.Longitude);
     }
 
     [Fact]
@@ -55,6 +57,11 @@ public sealed class HeartbeatStoreTests
             DeviceInfo = new()
             {
                 ["model"] = JsonSerializer.SerializeToElement("Jetson Nano")
+            },
+            Location = new DeviceLocation
+            {
+                Latitude = 47.61,
+                Longitude = -122.33
             }
         };
 }

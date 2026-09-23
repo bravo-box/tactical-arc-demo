@@ -13,7 +13,8 @@ edgeHeartbeat:
       "heartbeatIntervalSeconds": 5,
       "serviceBusTopic": "edge-heartbeat",
       "mqttPort": 1883,
-      "deviceInfoTimeoutSeconds": 5
+      "deviceInfoTimeoutSeconds": 5,
+      "locationTimeoutSeconds": 5
     }
   resources:
     requests:
@@ -39,6 +40,29 @@ deviceService:
     limits:
       cpu: 100m
       memory: 96Mi
+
+locationService:
+  image:
+    repository: location-service
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  deviceId: edge-01
+  locationHostPath: /var/lib/tactical-arc/location
+  serviceBus:
+    queue: update-location
+    fullyQualifiedNamespace: ""
+    existingSecret: location-service-servicebus
+    connectionStringKey: connection-string
+  initialLocation:
+    latitude: 47.6062
+    longitude: -122.3321
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
 
 mqtt:
   image:
@@ -106,7 +130,8 @@ imageUploader:
       "serviceBusFullyQualifiedNamespace": "",
       "connectivityHost": "1.1.1.1",
       "connectivityPort": 443,
-      "deviceInfoTimeoutSeconds": 5
+      "deviceInfoTimeoutSeconds": 5,
+      "locationTimeoutSeconds": 5
     }
   resources:
     requests:

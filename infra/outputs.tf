@@ -63,6 +63,11 @@ output "take_picture_queue_name" {
   value       = module.messaging.take_picture_queue_name
 }
 
+output "update_location_queue_name" {
+  description = "Service Bus queue receiving UpdateLocationRequest commands."
+  value       = module.messaging.update_location_queue_name
+}
+
 output "image_upload_topic_name" {
   description = "Service Bus topic receiving ImageUpload events."
   value       = module.messaging.image_upload_topic_name

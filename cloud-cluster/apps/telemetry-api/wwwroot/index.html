@@ -28,6 +28,10 @@
     .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
     .take-picture { width: auto; background: #1d4ed8; border-color: #60a5fa; font-weight: 700; }
     .take-picture:disabled { cursor: wait; opacity: .65; }
+    .location-form { display: grid; grid-template-columns: repeat(2, minmax(140px, 220px)) auto 1fr; align-items: end; gap: 12px; margin-bottom: 24px; }
+    .location-form label { color: #93a4bc; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+    .location-form input { display: block; width: 100%; margin-top: 6px; border: 1px solid #30415e; border-radius: 8px; padding: 11px; color: inherit; background: #0b1220; }
+    .update-location { width: auto; background: #1d4ed8; border-color: #60a5fa; font-weight: 700; }
     .error { color: #fb7185; }
     details { margin: 0 0 24px; border: 1px solid #243249; border-radius: 10px; background: #111b2d; }
     summary { padding: 14px; cursor: pointer; font-weight: 700; }
@@ -56,6 +60,7 @@
       main { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid #243249; }
       .details { grid-template-columns: repeat(2, 1fr); }
+      .location-form { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -82,6 +87,7 @@
     const imageMetadata = document.querySelector("#image-metadata");
     let selectedDevice = null;
     let imageCaptureEnabled = false;
+    let locationUpdatesEnabled = false;
 
     const escapeHtml = value => String(value).replace(/[&<>"']/g, char => (
       { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]
@@ -93,6 +99,7 @@
       ["Hostname", "hostname"],
       ["Architecture", "architecture"],
       ["Device info", image => formatDeviceInfo(image.deviceInfo)],
+      ["Location", image => image.location ? `${image.location.latitude}, ${image.location.longitude}` : "Unknown"],
       ["Captured", image => formatDate(image.capturedAt)],
       ["Uploaded", image => formatDate(image.uploadedAt)],
       ["Dimensions", image => `${image.width} × ${image.height}`],
@@ -148,6 +155,18 @@
       const images = await imageResponse.json();
       const requests = requestsResponse ? await requestsResponse.json() : [];
       const requestsPanelOpen = document.querySelector("#capture-requests")?.open ?? false;
+      const location = device.location;
+      const locationForm = locationUpdatesEnabled ? `
+        <form id="location-form" class="location-form">
+          <label>Latitude
+            <input name="latitude" type="number" min="-90" max="90" step="any" required value="${location ? escapeHtml(location.latitude) : ""}">
+          </label>
+          <label>Longitude
+            <input name="longitude" type="number" min="-180" max="180" step="any" required value="${location ? escapeHtml(location.longitude) : ""}">
+          </label>
+          <button class="update-location" type="submit">Update location</button>
+          <span id="location-message" role="status"></span>
+        </form>` : "";
       const capturePanel = imageCaptureEnabled ? `
         <div class="toolbar">
           <button id="take-picture" class="take-picture" type="button">Take picture</button>
@@ -171,13 +190,16 @@
           <div class="card"><div class="label">Health</div><div class="value status-${device.healthStatus}">${escapeHtml(device.healthStatus)}</div></div>
           <div class="card"><div class="label">Last seen</div><div class="value">${formatDate(device.lastSeen)}</div></div>
           <div class="card"><div class="label">Device info</div><div class="value">${escapeHtml(formatDeviceInfo(device.deviceInfo))}</div></div>
+          <div class="card"><div class="label">Location</div><div class="value">${location ? `${escapeHtml(location.latitude)}, ${escapeHtml(location.longitude)}` : "Unknown"}</div></div>
         </div>
+        ${locationForm}
         ${capturePanel}
         <h2>Heartbeat log</h2>
-        <table><thead><tr><th>Received</th><th>Device timestamp</th><th>IP address</th><th>Status</th></tr></thead>
+        <table><thead><tr><th>Received</th><th>Device timestamp</th><th>IP address</th><th>Location</th><th>Status</th></tr></thead>
         <tbody>${device.heartbeats.map(heartbeat => `<tr>
           <td>${formatDate(heartbeat.receivedAt)}</td><td>${formatDate(heartbeat.timestamp)}</td>
           <td>${escapeHtml(heartbeat.ipAddress)}</td>
+          <td>${heartbeat.location ? `${escapeHtml(heartbeat.location.latitude)}, ${escapeHtml(heartbeat.location.longitude)}` : "Unknown"}</td>
           <td class="status-${heartbeat.healthStatus}">${escapeHtml(heartbeat.healthStatus)}</td>
         </tr>`).join("")}</tbody></table>
         <h2>Images</h2>
@@ -214,6 +236,36 @@
           button.textContent = "Take picture";
         }
       });
+      document.querySelector("#location-form")?.addEventListener("submit", async event => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const button = form.querySelector("button");
+        const message = form.querySelector("#location-message");
+        const data = new FormData(form);
+        button.disabled = true;
+        message.className = "";
+        message.textContent = "Sending…";
+        try {
+          const response = await fetch(`/api/devices/${encodedName}/location`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              latitude: Number(data.get("latitude")),
+              longitude: Number(data.get("longitude"))
+            })
+          });
+          if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body.error || "Could not update location");
+          }
+          message.textContent = "Update queued; the next heartbeat will confirm the location.";
+        } catch (locationError) {
+          message.className = "error";
+          message.textContent = locationError.message;
+        } finally {
+          button.disabled = false;
+        }
+      });
     }
 
     document.querySelector(".modal-close").addEventListener("click", () => imageDialog.close());
@@ -223,12 +275,18 @@
     async function initialize() {
       const response = await fetch("/api/features");
       if (!response.ok) throw new Error("Unable to load application features");
-      imageCaptureEnabled = (await response.json()).imagesEnabled;
+      const features = await response.json();
+      imageCaptureEnabled = features.imagesEnabled;
+      locationUpdatesEnabled = features.locationUpdatesEnabled;
       await refreshDevices();
     }
 
     initialize().catch(error => contentElement.textContent = error.message);
-    setInterval(() => refreshDevices().catch(console.error), 5000);
+    setInterval(() => {
+      if (!document.querySelector("#location-form")?.contains(document.activeElement)) {
+        refreshDevices().catch(console.error);
+      }
+    }, 5000);
   </script>
 </body>
 </html>

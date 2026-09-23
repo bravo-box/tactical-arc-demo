@@ -2,7 +2,7 @@
 
 These scripts configure a Jetson Nano, Raspberry Pi, or Debian/Ubuntu edge
 device with K3s, Azure Arc-enabled Kubernetes, Service Bus, the
-`edge-heartbeat` application, and a local MQTT-backed `device-service`.
+`edge-heartbeat` application, and local MQTT-backed device and location services.
 The chart also contains an opt-in camera image
 pipeline for a V4L2-compatible camera such as `/dev/video0`.
 
@@ -57,9 +57,9 @@ For a standalone edge namespace with a topic-scoped sender credential:
 ```
 
 The script creates the `edge-heartbeat` topic, a `heartbeat-monitor`
-subscription for consumers, and an `edge-device-send` rule with only `Send`
-rights. Its connection string is written with mode `0600` under
-`remote-cluster/.secrets/`, which Git ignores.
+subscription, the session-aware `update-location` queue, and least-privilege
+edge credentials. The heartbeat sender and location receiver connection strings
+are written with mode `0600` under `remote-cluster/.secrets/`, which Git ignores.
 
 The Terraform stack also creates the topic and monitoring subscription in the
 private Premium namespace. That path requires device VPN/private DNS access
@@ -76,7 +76,8 @@ Edit the heartbeat configuration:
   "heartbeatIntervalSeconds": 5,
   "serviceBusTopic": "edge-heartbeat",
   "mqttPort": 1883,
-  "deviceInfoTimeoutSeconds": 5
+  "deviceInfoTimeoutSeconds": 5,
+  "locationTimeoutSeconds": 5
 }
 ```
 
@@ -88,14 +89,26 @@ device information to include in heartbeats and image metadata:
   "deviceId": "edge-01",
   "manufacturer": "Example",
   "model": "Edge Device",
-  "serialNumber": "replace-me",
-  "location": "replace-me"
+  "serialNumber": "replace-me"
 }
 ```
 
 The deploy script mounts this file directly from the device filesystem as a
 read-only `hostPath`. Pass `--device-config /absolute/path/device-info.json`
 to use another location.
+
+The chart initializes `/var/lib/tactical-arc/location/location.json` with
+`locationService.initialLocation` and mounts that host directory read/write
+into `location-service`. Existing coordinates survive pod upgrades and are not
+overwritten. Set the initial coordinates and device ID during deployment:
+
+```bash
+helm upgrade --install remote-cluster ./remote-cluster/helm/remote-cluster \
+  --namespace tactical-arc \
+  --set locationService.deviceId=edge-01 \
+  --set locationService.initialLocation.latitude=47.6062 \
+  --set locationService.initialLocation.longitude=-122.3321
+```
 
 Then build a multi-architecture image and deploy the local chart:
 
@@ -137,9 +150,11 @@ kubectl -n tactical-arc logs \
 
 The deploy script creates the Kubernetes Secret directly before invoking Helm,
 so the Service Bus credential is not stored in Helm values or release history.
-The heartbeat publishes only after a correlated `DeviceInfoRequest` /
-`DeviceInfoResponse` exchange with `device-service`, preventing incomplete
-device records when the local configuration is unavailable.
+The heartbeat publishes only after correlated device information and
+`RequestLocation` / `ResponseLocation` exchanges, preventing incomplete device
+records when either local service is unavailable. Location changes arrive as
+`UpdateLocationRequest`, are validated and atomically persisted, and produce an
+`UpdateLocationResponse` confirmation on MQTT.
 
 ## Camera image pipeline
 
@@ -171,8 +186,8 @@ The command body accepts either form:
 ```
 
 The capture service emits `SendImage` on `edge/images/send`. Before upload, the
-uploader requests current device information and adds it to the blob metadata
-and `ImageUpload` event. The uploader keeps
+uploader requests current device information and location, then adds both to
+the blob metadata and `ImageUpload` event. The uploader keeps
 the JPEG and JSON manifest on the persistent volume until both the blob upload
 and `ImageUpload` Service Bus notification succeed. With no connectivity it
 checks every five seconds, opens after five failures, waits one minute, then

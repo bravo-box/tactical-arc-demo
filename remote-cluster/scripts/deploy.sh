@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install or upgrade edge-heartbeat from a local, repository, URL, or OCI Helm chart.
 #
-# Usage: deploy.sh [--chart <chart-ref>] [--config <file>] [--device-config <file>] [--connection-string-file <file>]
+# Usage: deploy.sh [--chart <chart-ref>] [--config <file>] [--device-config <file>] [--connection-string-file <file>] [--location-connection-string-file <file>]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,11 +9,13 @@ CHART="${SCRIPT_DIR}/../helm/remote-cluster"
 CONFIG_FILE="${SCRIPT_DIR}/../config/edge-heartbeat.json"
 DEVICE_CONFIG_FILE="${SCRIPT_DIR}/../config/device-info.json"
 CONNECTION_STRING_FILE="${SCRIPT_DIR}/../.secrets/servicebus-connection-string"
+LOCATION_CONNECTION_STRING_FILE="${SCRIPT_DIR}/../.secrets/location-servicebus-connection-string"
 REGISTRY=""
 RELEASE="remote-cluster"
 NAMESPACE="tactical-arc"
 CHART_VERSION=""
 SECRET_NAME="edge-heartbeat-servicebus"
+LOCATION_SECRET_NAME="location-service-servicebus"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -35,6 +37,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   --connection-string-file)
     CONNECTION_STRING_FILE="$2"
+    shift 2
+    ;;
+  --location-connection-string-file)
+    LOCATION_CONNECTION_STRING_FILE="$2"
     shift 2
     ;;
   --registry)
@@ -79,11 +85,22 @@ if [ ! -r "${CONNECTION_STRING_FILE}" ] || [ ! -s "${CONNECTION_STRING_FILE}" ];
   echo "Run configure-service-bus.sh first or pass --connection-string-file." >&2
   exit 1
 fi
+if [ ! -r "${LOCATION_CONNECTION_STRING_FILE}" ] || [ ! -s "${LOCATION_CONNECTION_STRING_FILE}" ]; then
+  echo "Location Service Bus credential is missing or empty: ${LOCATION_CONNECTION_STRING_FILE}" >&2
+  echo "Run configure-service-bus.sh first or pass --location-connection-string-file." >&2
+  exit 1
+fi
 
 kubectl create namespace "${NAMESPACE}" --dry-run=client --output yaml | kubectl apply -f -
 kubectl create secret generic "${SECRET_NAME}" \
   --namespace "${NAMESPACE}" \
   --from-file="connection-string=${CONNECTION_STRING_FILE}" \
+  --dry-run=client \
+  --output yaml |
+  kubectl apply -f -
+kubectl create secret generic "${LOCATION_SECRET_NAME}" \
+  --namespace "${NAMESPACE}" \
+  --from-file="connection-string=${LOCATION_CONNECTION_STRING_FILE}" \
   --dry-run=client \
   --output yaml |
   kubectl apply -f -
@@ -95,6 +112,7 @@ helm_args=(
   --set-file "edgeHeartbeat.config=${CONFIG_FILE}"
   --set-string "deviceService.configHostPath=$(readlink -f "${DEVICE_CONFIG_FILE}")"
   --set "edgeHeartbeat.serviceBus.existingSecret=${SECRET_NAME}"
+  --set "locationService.serviceBus.existingSecret=${LOCATION_SECRET_NAME}"
 )
 if [ -n "${REGISTRY}" ]; then
   helm_args+=(--set "imageRegistry=${REGISTRY}")
@@ -108,6 +126,11 @@ kubectl rollout status \
   --namespace "${NAMESPACE}" \
   deployment \
   --selector "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=edge-heartbeat" \
+  --timeout=180s
+kubectl rollout status \
+  --namespace "${NAMESPACE}" \
+  deployment \
+  --selector "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=location-service" \
   --timeout=180s
 kubectl rollout status \
   --namespace "${NAMESPACE}" \

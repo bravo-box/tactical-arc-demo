@@ -63,3 +63,16 @@ public sealed class CameraCommandOptions
 
     public string Queue { get; set; } = "take-picture";
 }
+
+public sealed class LocationCommandOptions
+{
+    public const string SectionName = "LocationCommands";
+
+    public bool Enabled { get; set; }
+
+    public string? ConnectionString { get; set; }
+
+    public string? FullyQualifiedNamespace { get; set; }
+
+    public string Queue { get; set; } = "update-location";
+}

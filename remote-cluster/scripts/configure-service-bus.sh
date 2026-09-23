@@ -14,6 +14,9 @@ TOPIC="edge-heartbeat"
 MONITOR_SUBSCRIPTION="heartbeat-monitor"
 AUTH_RULE="edge-device-send"
 SECRET_FILE="${SCRIPT_DIR}/../.secrets/servicebus-connection-string"
+LOCATION_QUEUE="update-location"
+LOCATION_AUTH_RULE="edge-location-listen"
+LOCATION_SECRET_FILE="${SCRIPT_DIR}/../.secrets/location-servicebus-connection-string"
 CREATE_RESOURCE_GROUP="false"
 LIST_RESOURCE_GROUPS="false"
 
@@ -49,6 +52,14 @@ while [[ $# -gt 0 ]]; do
     ;;
   --secret-file)
     SECRET_FILE="$2"
+    shift 2
+    ;;
+  --location-queue)
+    LOCATION_QUEUE="$2"
+    shift 2
+    ;;
+  --location-secret-file)
+    LOCATION_SECRET_FILE="$2"
     shift 2
     ;;
   --create-resource-group)
@@ -176,5 +187,33 @@ az servicebus topic authorization-rule keys list \
   --output tsv >"${SECRET_FILE}"
 chmod 0600 "${SECRET_FILE}"
 
+if ! az servicebus queue show --resource-group "${RESOURCE_GROUP}" --namespace-name "${NAMESPACE}" --name "${LOCATION_QUEUE}" >/dev/null 2>&1; then
+  az servicebus queue create \
+    --resource-group "${RESOURCE_GROUP}" \
+    --namespace-name "${NAMESPACE}" \
+    --name "${LOCATION_QUEUE}" \
+    --enable-session true \
+    --output none
+fi
+if ! az servicebus queue authorization-rule show --resource-group "${RESOURCE_GROUP}" --namespace-name "${NAMESPACE}" --queue-name "${LOCATION_QUEUE}" --name "${LOCATION_AUTH_RULE}" >/dev/null 2>&1; then
+  az servicebus queue authorization-rule create \
+    --resource-group "${RESOURCE_GROUP}" \
+    --namespace-name "${NAMESPACE}" \
+    --queue-name "${LOCATION_QUEUE}" \
+    --name "${LOCATION_AUTH_RULE}" \
+    --rights Listen \
+    --output none
+fi
+install -d -m 0700 "$(dirname "${LOCATION_SECRET_FILE}")"
+az servicebus queue authorization-rule keys list \
+  --resource-group "${RESOURCE_GROUP}" \
+  --namespace-name "${NAMESPACE}" \
+  --queue-name "${LOCATION_QUEUE}" \
+  --name "${LOCATION_AUTH_RULE}" \
+  --query primaryConnectionString \
+  --output tsv >"${LOCATION_SECRET_FILE}"
+chmod 0600 "${LOCATION_SECRET_FILE}"
+
 echo "Configured Service Bus topic '${TOPIC}' and subscription '${MONITOR_SUBSCRIPTION}'."
 echo "Sender credential written to ${SECRET_FILE} (mode 0600)."
+echo "Location receiver credential written to ${LOCATION_SECRET_FILE} (mode 0600)."
