@@ -1,5 +1,8 @@
+using Azure.Core;
+using Azure.Identity;
 using HeartbeatMonitor.Models;
 using HeartbeatMonitor.Services;
+using Microsoft.Azure.Cosmos;
 
 var builder = WebApplication.CreateBuilder(args);
 var imagesEnabled = builder.Configuration.GetValue<bool>("Images:Enabled");
@@ -16,7 +19,34 @@ builder.Services.Configure<ImageFeatureOptions>(
     builder.Configuration.GetSection(ImageFeatureOptions.SectionName));
 builder.Services.Configure<CameraCommandOptions>(
     builder.Configuration.GetSection(CameraCommandOptions.SectionName));
+builder.Services.Configure<CosmosOptions>(
+    builder.Configuration.GetSection(CosmosOptions.SectionName));
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<TokenCredential, DefaultAzureCredential>();
+builder.Services.AddSingleton(
+    serviceProvider =>
+    {
+        var options = builder.Configuration
+            .GetSection(CosmosOptions.SectionName)
+            .Get<CosmosOptions>() ?? new CosmosOptions();
+        if (!Uri.TryCreate(options.Endpoint, UriKind.Absolute, out var endpoint))
+        {
+            throw new InvalidOperationException("Cosmos:Endpoint must be an absolute URI.");
+        }
+
+        return new CosmosClient(
+            endpoint.ToString(),
+            serviceProvider.GetRequiredService<TokenCredential>(),
+            new CosmosClientOptions
+            {
+                ApplicationName = "tactical-arc-telemetry-api",
+                SerializerOptions = new CosmosSerializationOptions
+                {
+                    PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase
+                }
+            });
+    });
+builder.Services.AddSingleton<IDeviceDocumentStore, CosmosDeviceDocumentStore>();
 builder.Services.AddSingleton<HeartbeatStore>();
 builder.Services.AddSingleton<ImageStore>();
 builder.Services.AddSingleton<CaptureRequestStore>();
@@ -36,16 +66,20 @@ app.UseStaticFiles();
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapGet("/readyz", () => Results.Ok(new { status = "ready" }));
 app.MapGet("/api/features", () => Results.Ok(new { imagesEnabled }));
-app.MapGet("/api/devices", (HeartbeatStore store) => Results.Ok(store.GetDevices()));
+app.MapGet(
+    "/api/devices",
+    async (HeartbeatStore store, CancellationToken cancellationToken) =>
+        Results.Ok(await store.GetDevicesAsync(cancellationToken)));
 app.MapGet(
     "/api/devices/{deviceName}",
-    (string deviceName, HeartbeatStore store) =>
-        store.GetDevice(deviceName) is { } device
+    async (string deviceName, HeartbeatStore store, CancellationToken cancellationToken) =>
+        await store.GetDeviceAsync(deviceName, cancellationToken) is { } device
             ? Results.Ok(device)
             : Results.NotFound(new { error = "device not found" }));
 app.MapGet(
     "/api/devices/{deviceName}/images",
-    (string deviceName, ImageStore store) => Results.Ok(store.GetImages(deviceName)));
+    async (string deviceName, ImageStore store, CancellationToken cancellationToken) =>
+        Results.Ok(await store.GetImagesAsync(deviceName, cancellationToken)));
 app.MapGet(
     "/api/devices/{deviceName}/capture-requests",
     (string deviceName, CaptureRequestStore store) => Results.Ok(store.GetForDevice(deviceName)));
@@ -59,7 +93,7 @@ if (imagesEnabled)
             TakePictureSender sender,
             CancellationToken cancellationToken) =>
         {
-            if (devices.GetDevice(deviceName) is null)
+            if (await devices.GetDeviceAsync(deviceName, cancellationToken) is null)
             {
                 return Results.NotFound(new { error = "device not found" });
             }
@@ -78,7 +112,7 @@ app.MapGet(
         BlobImageReader reader,
         CancellationToken cancellationToken) =>
     {
-        if (store.GetImage(imageId) is not { } image)
+        if (await store.GetImageAsync(imageId, cancellationToken) is not { } image)
         {
             return Results.NotFound(new { error = "image not found" });
         }

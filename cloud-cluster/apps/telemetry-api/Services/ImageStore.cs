@@ -1,52 +1,79 @@
-using System.Collections.Concurrent;
 using HeartbeatMonitor.Models;
+using Microsoft.Extensions.Options;
 
 namespace HeartbeatMonitor.Services;
 
 public sealed class ImageStore
 {
-    private readonly ConcurrentDictionary<string, DeviceImage> _images =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly IDeviceDocumentStore _documents;
+    private readonly MonitorOptions _options;
 
-    public bool TryAdd(DeviceImage image, out string validationError)
+    public ImageStore(
+        IDeviceDocumentStore documents,
+        IOptions<MonitorOptions> options)
+    {
+        _documents = documents;
+        _options = options.Value;
+        if (_options.MaxImagesPerDevice <= 0)
+        {
+            throw new InvalidOperationException("Monitor:MaxImagesPerDevice must be positive.");
+        }
+    }
+
+    public async Task<(bool Accepted, string ValidationError)> TryAddAsync(
+        DeviceImage image,
+        CancellationToken cancellationToken)
+    {
+        var validationError = Validate(image);
+        if (validationError is not null)
+        {
+            return (false, validationError);
+        }
+
+        image.DeviceId = image.DeviceId.Trim().ToLowerInvariant();
+        await _documents.AddImageAsync(image, _options.MaxImagesPerDevice, cancellationToken);
+        return (true, string.Empty);
+    }
+
+    public async Task<IReadOnlyList<DeviceImage>> GetImagesAsync(
+        string deviceName,
+        CancellationToken cancellationToken)
+    {
+        var device = await _documents.GetDeviceAsync(deviceName, cancellationToken);
+        return device?.Images
+            .OrderByDescending(image => image.CapturedAt)
+            .ToArray() ?? [];
+    }
+
+    public Task<DeviceImage?> GetImageAsync(
+        string imageId,
+        CancellationToken cancellationToken) =>
+        _documents.GetImageAsync(imageId, cancellationToken);
+
+    private static string? Validate(DeviceImage image)
     {
         if (!string.Equals(image.Type, "ImageUpload", StringComparison.Ordinal))
         {
-            validationError = "type must be ImageUpload";
-            return false;
+            return "type must be ImageUpload";
         }
 
         if (string.IsNullOrWhiteSpace(image.Id) ||
             string.IsNullOrWhiteSpace(image.DeviceId) ||
             string.IsNullOrWhiteSpace(image.BlobName))
         {
-            validationError = "id, deviceId, and blobName are required";
-            return false;
+            return "id, deviceId, and blobName are required";
         }
 
         if (image.Width <= 0 || image.Height <= 0)
         {
-            validationError = "width and height must be positive";
-            return false;
+            return "width and height must be positive";
         }
 
         if (image.CorrelationId == Guid.Empty)
         {
-            validationError = "correlationId must be a GUID";
-            return false;
+            return "correlationId must be a GUID";
         }
 
-        _images[image.Id] = image;
-        validationError = string.Empty;
-        return true;
+        return null;
     }
-
-    public IReadOnlyList<DeviceImage> GetImages(string deviceName) =>
-        _images.Values
-            .Where(image => string.Equals(image.DeviceId, deviceName, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(image => image.CapturedAt)
-            .ToArray();
-
-    public DeviceImage? GetImage(string imageId) =>
-        _images.TryGetValue(imageId, out var image) ? image : null;
 }

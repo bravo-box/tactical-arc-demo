@@ -15,14 +15,26 @@ public sealed record Heartbeat
 
     [JsonPropertyName("timestamp")]
     public required DateTimeOffset Timestamp { get; init; }
+
+    [JsonPropertyName("location")]
+    public DeviceLocation? Location { get; init; }
+
+    [JsonPropertyName("specs")]
+    public IReadOnlyList<DeviceSpec>? Specs { get; init; }
 }
+
+public sealed record DeviceLocation(double Latitude, double Longitude);
+
+public sealed record DeviceSpec(string Name, string Value);
 
 public sealed record ReceivedHeartbeat(
     string DeviceName,
     string IpAddress,
     string HealthStatus,
     DateTimeOffset Timestamp,
-    DateTimeOffset ReceivedAt);
+    DateTimeOffset ReceivedAt,
+    DeviceLocation? Location,
+    IReadOnlyList<DeviceSpec> Specs);
 
 public sealed record DeviceSummary(
     string DeviceName,
@@ -37,4 +49,6 @@ public sealed record DeviceDetails(
     string HealthStatus,
     DateTimeOffset LastSeen,
     bool IsActive,
+    DeviceLocation? Location,
+    IReadOnlyList<DeviceSpec> Specs,
     IReadOnlyList<ReceivedHeartbeat> Heartbeats);

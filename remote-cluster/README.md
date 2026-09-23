@@ -73,9 +73,23 @@ Edit the device-local configuration:
   "device-name": "edge-01",
   "healthStatus": "Green",
   "heartbeatIntervalSeconds": 5,
-  "serviceBusTopic": "edge-heartbeat"
+  "serviceBusTopic": "edge-heartbeat",
+  "location": {
+    "latitude": 38.8977,
+    "longitude": -77.0365
+  },
+  "specs": [
+    {
+      "name": "architecture",
+      "value": "arm64"
+    }
+  ]
 }
 ```
+
+`location` and `specs` are optional. When present, the cloud application saves
+them with the device's bounded heartbeat and image metadata histories in its
+single Cosmos DB document.
 
 Then build a multi-architecture image and deploy the local chart:
 

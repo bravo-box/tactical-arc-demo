@@ -161,7 +161,7 @@ variable "aks_dns_service_ip" {
 variable "workload_identity_namespace" {
   description = "Kubernetes namespace for the telemetry workload identity."
   type        = string
-  default     = "tactical-demo"
+  default     = "tactical-arc"
 }
 
 variable "workload_identity_service_account" {

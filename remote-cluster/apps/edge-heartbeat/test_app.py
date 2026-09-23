@@ -19,6 +19,8 @@ class EdgeHeartbeatTests(unittest.TestCase):
                         "healthStatus": "Green",
                         "heartbeatIntervalSeconds": 5,
                         "serviceBusTopic": "edge-heartbeat",
+                        "location": {"latitude": 38.8977, "longitude": -77.0365},
+                        "specs": [{"name": "architecture", "value": "arm64"}],
                     }
                 ),
                 encoding="utf-8",
@@ -30,6 +32,8 @@ class EdgeHeartbeatTests(unittest.TestCase):
         self.assertEqual(config["healthStatus"], "Green")
         self.assertEqual(config["heartbeatIntervalSeconds"], 5.0)
         self.assertEqual(config["serviceBusTopic"], "edge-heartbeat")
+        self.assertEqual(config["location"]["latitude"], 38.8977)
+        self.assertEqual(config["specs"][0]["value"], "arm64")
 
     def test_load_config_rejects_non_positive_interval(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -66,7 +70,12 @@ class EdgeHeartbeatTests(unittest.TestCase):
                 app.load_config(path)
 
     def test_build_heartbeat_includes_device_metadata(self) -> None:
-        heartbeat = app.build_heartbeat("edge-01", "Green")
+        heartbeat = app.build_heartbeat(
+            "edge-01",
+            "Green",
+            {"latitude": 38.8977, "longitude": -77.0365},
+            [{"name": "architecture", "value": "arm64"}],
+        )
 
         self.assertEqual(heartbeat["type"], "edge-heartbeat")
         self.assertEqual(heartbeat["device-name"], "edge-01")
@@ -74,6 +83,27 @@ class EdgeHeartbeatTests(unittest.TestCase):
         self.assertTrue(heartbeat["ipAddress"])
         self.assertTrue(heartbeat["id"])
         self.assertTrue(heartbeat["timestamp"])
+        self.assertEqual(heartbeat["location"]["longitude"], -77.0365)
+        self.assertEqual(heartbeat["specs"][0]["name"], "architecture")
+
+    def test_load_config_rejects_invalid_location(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "device-name": "edge-01",
+                        "healthStatus": "Green",
+                        "heartbeatIntervalSeconds": 5,
+                        "serviceBusTopic": "edge-heartbeat",
+                        "location": {"latitude": 91, "longitude": 0},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "latitude"):
+                app.load_config(path)
 
     def test_namespace_connection_string_removes_entity_path(self) -> None:
         connection_string = (
