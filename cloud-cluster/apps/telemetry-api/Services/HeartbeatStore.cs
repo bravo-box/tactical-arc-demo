@@ -55,7 +55,8 @@ public sealed class HeartbeatStore
             heartbeat.IpAddress.Trim(),
             NormalizeStatus(heartbeat.HealthStatus),
             heartbeat.Timestamp,
-            _timeProvider.GetUtcNow());
+            _timeProvider.GetUtcNow(),
+            heartbeat.DeviceInfo);
 
         var state = _devices.GetOrAdd(received.DeviceName, _ => new DeviceState());
         lock (state)
@@ -103,6 +104,7 @@ public sealed class HeartbeatStore
                 latest.HealthStatus,
                 latest.ReceivedAt,
                 IsActive(latest.ReceivedAt, _timeProvider.GetUtcNow()),
+                latest.DeviceInfo,
                 state.Heartbeats.ToArray());
         }
     }

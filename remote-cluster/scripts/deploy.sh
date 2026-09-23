@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Install or upgrade edge-heartbeat from a local, repository, URL, or OCI Helm chart.
 #
-# Usage: deploy.sh [--chart <chart-ref>] [--config <file>] [--connection-string-file <file>]
+# Usage: deploy.sh [--chart <chart-ref>] [--config <file>] [--device-config <file>] [--connection-string-file <file>]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHART="${SCRIPT_DIR}/../helm/remote-cluster"
 CONFIG_FILE="${SCRIPT_DIR}/../config/edge-heartbeat.json"
+DEVICE_CONFIG_FILE="${SCRIPT_DIR}/../config/device-info.json"
 CONNECTION_STRING_FILE="${SCRIPT_DIR}/../.secrets/servicebus-connection-string"
 REGISTRY=""
 RELEASE="remote-cluster"
@@ -26,6 +27,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   --config)
     CONFIG_FILE="$2"
+    shift 2
+    ;;
+  --device-config)
+    DEVICE_CONFIG_FILE="$2"
     shift 2
     ;;
   --connection-string-file)
@@ -65,6 +70,10 @@ if [ ! -r "${CONFIG_FILE}" ]; then
   echo "Heartbeat configuration is not readable: ${CONFIG_FILE}" >&2
   exit 1
 fi
+if [ ! -r "${DEVICE_CONFIG_FILE}" ]; then
+  echo "Device information configuration is not readable: ${DEVICE_CONFIG_FILE}" >&2
+  exit 1
+fi
 if [ ! -r "${CONNECTION_STRING_FILE}" ] || [ ! -s "${CONNECTION_STRING_FILE}" ]; then
   echo "Service Bus credential is missing or empty: ${CONNECTION_STRING_FILE}" >&2
   echo "Run configure-service-bus.sh first or pass --connection-string-file." >&2
@@ -84,6 +93,7 @@ helm_args=(
   --create-namespace
   --wait
   --set-file "edgeHeartbeat.config=${CONFIG_FILE}"
+  --set-string "deviceService.configHostPath=$(readlink -f "${DEVICE_CONFIG_FILE}")"
   --set "edgeHeartbeat.serviceBus.existingSecret=${SECRET_NAME}"
 )
 if [ -n "${REGISTRY}" ]; then
@@ -98,4 +108,9 @@ kubectl rollout status \
   --namespace "${NAMESPACE}" \
   deployment \
   --selector "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=edge-heartbeat" \
+  --timeout=180s
+kubectl rollout status \
+  --namespace "${NAMESPACE}" \
+  deployment \
+  --selector "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=device-service" \
   --timeout=180s

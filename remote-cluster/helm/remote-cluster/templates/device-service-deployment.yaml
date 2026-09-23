@@ -1,24 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "remote-cluster.fullname" . }}-edge-heartbeat
+  name: {{ include "remote-cluster.fullname" . }}-device-service
   labels:
     {{- include "remote-cluster.labels" . | nindent 4 }}
-    app.kubernetes.io/component: edge-heartbeat
+    app.kubernetes.io/component: device-service
 spec:
-  replicas: {{ .Values.edgeHeartbeat.replicaCount }}
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "remote-cluster.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
-      app.kubernetes.io/component: edge-heartbeat
+      app.kubernetes.io/component: device-service
   template:
     metadata:
-      annotations:
-        checksum/config: {{ .Values.edgeHeartbeat.config | sha256sum }}
       labels:
         {{- include "remote-cluster.labels" . | nindent 8 }}
-        app.kubernetes.io/component: edge-heartbeat
+        app.kubernetes.io/component: device-service
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -27,23 +25,21 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
+        runAsGroup: 65532
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: edge-heartbeat
-          image: {{ include "remote-cluster.image" . }}
-          imagePullPolicy: {{ .Values.edgeHeartbeat.image.pullPolicy }}
+        - name: device-service
+          image: {{ if .Values.imageRegistry }}{{ .Values.imageRegistry }}/{{ end }}{{ .Values.deviceService.image.repository }}:{{ .Values.deviceService.image.tag }}
+          imagePullPolicy: {{ .Values.deviceService.image.pullPolicy }}
           env:
             - name: MQTT_HOST
               value: {{ include "remote-cluster.fullname" . }}-mqtt
-            - name: SERVICEBUS_CONNECTION_STRING
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.edgeHeartbeat.serviceBus.existingSecret }}
-                  key: connection-string
+            - name: MQTT_PORT
+              value: {{ .Values.mqtt.port | quote }}
           volumeMounts:
-            - name: config
-              mountPath: /etc/edge-heartbeat
+            - name: device-info
+              mountPath: /etc/device-service/device.json
               readOnly: true
           securityContext:
             allowPrivilegeEscalation: false
@@ -52,8 +48,9 @@ spec:
               drop:
                 - ALL
           resources:
-            {{- toYaml .Values.edgeHeartbeat.resources | nindent 12 }}
+            {{- toYaml .Values.deviceService.resources | nindent 12 }}
       volumes:
-        - name: config
-          configMap:
-            name: {{ include "remote-cluster.fullname" . }}-edge-heartbeat
+        - name: device-info
+          hostPath:
+            path: {{ required "deviceService.configHostPath is required" .Values.deviceService.configHostPath }}
+            type: File

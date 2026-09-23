@@ -87,10 +87,12 @@
       { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]
     ));
     const formatDate = value => new Date(value).toLocaleString();
+    const formatDeviceInfo = value => JSON.stringify(value || {}, null, 2);
     const metadataFields = [
       ["Device", "deviceId"],
       ["Hostname", "hostname"],
       ["Architecture", "architecture"],
+      ["Device info", image => formatDeviceInfo(image.deviceInfo)],
       ["Captured", image => formatDate(image.capturedAt)],
       ["Uploaded", image => formatDate(image.uploadedAt)],
       ["Dimensions", image => `${image.width} × ${image.height}`],
@@ -168,6 +170,7 @@
           <div class="card"><div class="label">IP address</div><div class="value">${escapeHtml(device.ipAddress)}</div></div>
           <div class="card"><div class="label">Health</div><div class="value status-${device.healthStatus}">${escapeHtml(device.healthStatus)}</div></div>
           <div class="card"><div class="label">Last seen</div><div class="value">${formatDate(device.lastSeen)}</div></div>
+          <div class="card"><div class="label">Device info</div><div class="value">${escapeHtml(formatDeviceInfo(device.deviceInfo))}</div></div>
         </div>
         ${capturePanel}
         <h2>Heartbeat log</h2>

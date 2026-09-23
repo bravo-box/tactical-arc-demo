@@ -22,11 +22,19 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: remote-cluster/apps/edge-heartbeat/requirements.txt
+          cache-dependency-path: remote-cluster/apps/*/requirements.txt
       - name: Install edge dependencies
-        run: pip install --requirement remote-cluster/apps/edge-heartbeat/requirements.txt
-      - name: Test edge heartbeat
-        working-directory: remote-cluster/apps/edge-heartbeat
-        run: python -m unittest --verbose
+        run: |
+          pip install --requirement remote-cluster/apps/edge-heartbeat/requirements.txt
+          pip install --requirement remote-cluster/apps/device-service/requirements.txt
+          pip install --requirement remote-cluster/apps/camera-capture/requirements.txt
+          pip install --requirement remote-cluster/apps/image-uploader/requirements.txt
+      - name: Test edge applications
+        shell: bash
+        run: |
+          set -euo pipefail
+          for app in edge-heartbeat device-service camera-capture image-uploader; do
+            (cd "remote-cluster/apps/${app}" && python -m unittest --verbose)
+          done
       - name: Test heartbeat monitor
         run: dotnet test cloud-cluster/apps/telemetry-api.Tests/HeartbeatMonitor.Tests.csproj --configuration Release

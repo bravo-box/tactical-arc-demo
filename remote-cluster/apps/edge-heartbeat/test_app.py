@@ -66,7 +66,11 @@ class EdgeHeartbeatTests(unittest.TestCase):
                 app.load_config(path)
 
     def test_build_heartbeat_includes_device_metadata(self) -> None:
-        heartbeat = app.build_heartbeat("edge-01", "Green")
+        heartbeat = app.build_heartbeat(
+            "edge-01",
+            "Green",
+            {"model": "Jetson Nano"},
+        )
 
         self.assertEqual(heartbeat["type"], "edge-heartbeat")
         self.assertEqual(heartbeat["device-name"], "edge-01")
@@ -74,6 +78,7 @@ class EdgeHeartbeatTests(unittest.TestCase):
         self.assertTrue(heartbeat["ipAddress"])
         self.assertTrue(heartbeat["id"])
         self.assertTrue(heartbeat["timestamp"])
+        self.assertEqual(heartbeat["deviceInfo"]["model"], "Jetson Nano")
 
     def test_namespace_connection_string_removes_entity_path(self) -> None:
         connection_string = (
