@@ -17,6 +17,31 @@ Build out an application showing remote management of a device at the edge using
 | `/remote-cluster/scripts` | Edge scripts, including Kubernetes/Docker stand-up for the edge cluster. |
 | `/scripts` | General scripts for the repo. |
 
+## Edge camera image flow
+
+The optional image pipeline extends the heartbeat monitor without changing its
+default deployment:
+
+1. `camera-capture` receives a `TakePicture` JSON command from the
+   `take-picture` Service Bus queue, captures `/dev/video0`, and writes the JPEG
+   plus a recovery manifest to the shared edge volume.
+2. It publishes a QoS 1 `SendImage` event to the local Mosquitto router.
+3. `image-uploader` uploads pending manifests to the private `device-images`
+   blob container. Connectivity is checked every five seconds; five failures
+   open the circuit for one minute, followed by one-second half-open probes
+   until connectivity returns.
+4. After upload, it publishes `ImageUpload` to Service Bus and removes the
+   local image and manifest.
+5. The existing cloud heartbeat monitor consumes `ImageUpload`. Selecting a
+   device shows its images as tiles; selecting a tile opens the full image and
+   capture metadata.
+
+Set `imagePipeline.enabled=true` in the remote chart and
+`telemetryApi.imageServiceBus.enabled=true` in the cloud chart after applying
+the Terraform resources. Both applications support connection strings for
+local/demo use and `DefaultAzureCredential` with the private Terraform
+deployment.
+
 ## Dev container
 
 `.devcontainer/` provides a container with everything needed to work on this repo:

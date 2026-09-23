@@ -1,0 +1,17 @@
+{{- if .Values.imagePipeline.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "remote-cluster.fullname" . }}-image-pipeline
+  labels:
+    {{- include "remote-cluster.labels" . | nindent 4 }}
+data:
+  camera.json: |
+    {{- .Values.cameraCapture.config | nindent 4 }}
+  uploader.json: |
+    {{- .Values.imageUploader.config | nindent 4 }}
+  mosquitto.conf: |
+    listener {{ .Values.mqtt.port }}
+    allow_anonymous true
+    persistence false
+{{- end }}

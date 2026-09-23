@@ -39,12 +39,24 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            - name: Images__Enabled
+              value: {{ .Values.telemetryApi.imageServiceBus.enabled | quote }}
             - name: ServiceBus__Topic
               value: {{ .Values.telemetryApi.serviceBus.topic | quote }}
             - name: ServiceBus__Subscription
               value: {{ .Values.telemetryApi.serviceBus.subscription | quote }}
             - name: ServiceBus__FullyQualifiedNamespace
               value: {{ .Values.telemetryApi.serviceBus.fullyQualifiedNamespace | quote }}
+            - name: ImageServiceBus__Topic
+              value: {{ .Values.telemetryApi.imageServiceBus.topic | quote }}
+            - name: ImageServiceBus__Subscription
+              value: {{ .Values.telemetryApi.imageServiceBus.subscription | quote }}
+            - name: ImageServiceBus__FullyQualifiedNamespace
+              value: {{ .Values.telemetryApi.imageServiceBus.fullyQualifiedNamespace | quote }}
+            - name: Storage__Container
+              value: {{ .Values.telemetryApi.storage.container | quote }}
+            - name: Storage__AccountUrl
+              value: {{ .Values.telemetryApi.storage.accountUrl | quote }}
             - name: Monitor__ActiveDeviceTimeoutSeconds
               value: {{ .Values.telemetryApi.monitor.activeDeviceTimeoutSeconds | quote }}
             - name: Monitor__MaxHeartbeatsPerDevice
@@ -55,6 +67,20 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.telemetryApi.serviceBus.existingSecret }}
                   key: {{ .Values.telemetryApi.serviceBus.connectionStringKey }}
+            {{- end }}
+            {{- if .Values.telemetryApi.imageServiceBus.existingSecret }}
+            - name: ImageServiceBus__ConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetryApi.imageServiceBus.existingSecret }}
+                  key: {{ .Values.telemetryApi.imageServiceBus.connectionStringKey }}
+            {{- end }}
+            {{- if .Values.telemetryApi.storage.existingSecret }}
+            - name: Storage__ConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetryApi.storage.existingSecret }}
+                  key: {{ .Values.telemetryApi.storage.connectionStringKey }}
             {{- end }}
           livenessProbe:
             httpGet:

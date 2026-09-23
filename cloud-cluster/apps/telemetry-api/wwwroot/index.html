@@ -28,6 +28,18 @@
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 12px; border-bottom: 1px solid #243249; text-align: left; }
     th { color: #93a4bc; font-size: .75rem; text-transform: uppercase; }
+    .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 12px; }
+    .image-tile { padding: 0; overflow: hidden; }
+    .image-tile img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #050a13; }
+    .image-tile span { display: block; padding: 10px 12px; }
+    dialog { width: min(960px, calc(100% - 32px)); max-height: 92vh; padding: 0; border: 1px solid #30415e; border-radius: 12px; background: #111b2d; color: inherit; }
+    dialog::backdrop { background: rgb(0 0 0 / .8); }
+    dialog > img { display: block; width: 100%; max-height: 65vh; object-fit: contain; background: #050a13; }
+    .modal-details { padding: 20px; }
+    .modal-close { position: absolute; top: 12px; right: 12px; width: 40px; padding: 8px; text-align: center; border-radius: 50%; background: rgb(11 18 32 / .9); font-size: 1.2rem; }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; }
+    dt { color: #93a4bc; }
+    dd { margin: 0; overflow-wrap: anywhere; }
     .empty { color: #93a4bc; padding: 28px 0; }
     @media (max-width: 760px) {
       main { grid-template-columns: 1fr; }
@@ -42,15 +54,49 @@
     <aside><div id="devices"><div class="empty">Waiting for devices...</div></div></aside>
     <section id="content"><div class="empty">Select a device to see its heartbeat history.</div></section>
   </main>
+  <dialog id="image-dialog">
+    <button class="modal-close" aria-label="Close image">&times;</button>
+    <img id="full-image" alt="">
+    <div class="modal-details">
+      <h2 id="image-title"></h2>
+      <dl id="image-metadata"></dl>
+    </div>
+  </dialog>
   <script>
     const devicesElement = document.querySelector("#devices");
     const contentElement = document.querySelector("#content");
+    const imageDialog = document.querySelector("#image-dialog");
+    const fullImage = document.querySelector("#full-image");
+    const imageTitle = document.querySelector("#image-title");
+    const imageMetadata = document.querySelector("#image-metadata");
     let selectedDevice = null;
 
     const escapeHtml = value => String(value).replace(/[&<>"']/g, char => (
       { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]
     ));
     const formatDate = value => new Date(value).toLocaleString();
+    const metadataFields = [
+      ["Device", "deviceId"],
+      ["Hostname", "hostname"],
+      ["Architecture", "architecture"],
+      ["Captured", image => formatDate(image.capturedAt)],
+      ["Uploaded", image => formatDate(image.uploadedAt)],
+      ["Dimensions", image => `${image.width} × ${image.height}`],
+      ["File", "fileName"],
+      ["Image ID", "id"],
+      ["Command ID", image => image.commandId || "—"]
+    ];
+
+    function openImage(image) {
+      fullImage.src = `/api/images/${encodeURIComponent(image.id)}/content`;
+      fullImage.alt = `Capture from ${image.deviceId} at ${image.capturedAt}`;
+      imageTitle.textContent = image.fileName;
+      imageMetadata.innerHTML = metadataFields.map(([label, accessor]) => {
+        const value = typeof accessor === "function" ? accessor(image) : image[accessor];
+        return `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`;
+      }).join("");
+      imageDialog.showModal();
+    }
 
     async function refreshDevices() {
       const response = await fetch("/api/devices");
@@ -74,9 +120,14 @@
     }
 
     async function loadDetails(deviceName) {
-      const response = await fetch(`/api/devices/${encodeURIComponent(deviceName)}`);
-      if (!response.ok) return;
-      const device = await response.json();
+      const encodedName = encodeURIComponent(deviceName);
+      const [deviceResponse, imageResponse] = await Promise.all([
+        fetch(`/api/devices/${encodedName}`),
+        fetch(`/api/devices/${encodedName}/images`)
+      ]);
+      if (!deviceResponse.ok || !imageResponse.ok) return;
+      const device = await deviceResponse.json();
+      const images = await imageResponse.json();
       contentElement.innerHTML = `
         <div class="details">
           <div class="card"><div class="label">Device</div><div class="value">${escapeHtml(device.deviceName)}</div></div>
@@ -90,9 +141,23 @@
           <td>${formatDate(heartbeat.receivedAt)}</td><td>${formatDate(heartbeat.timestamp)}</td>
           <td>${escapeHtml(heartbeat.ipAddress)}</td>
           <td class="status-${heartbeat.healthStatus}">${escapeHtml(heartbeat.healthStatus)}</td>
-        </tr>`).join("")}</tbody></table>`;
+        </tr>`).join("")}</tbody></table>
+        <h2>Images</h2>
+        ${images.length ? `<div class="gallery">${images.map(image => `
+          <button class="image-tile" data-image-id="${escapeHtml(image.id)}">
+            <img src="/api/images/${encodeURIComponent(image.id)}/content" alt="Capture from ${escapeHtml(image.deviceId)}" loading="lazy">
+            <span>${formatDate(image.capturedAt)}</span>
+          </button>`).join("")}</div>` : '<div class="empty">No images have been uploaded for this device.</div>'}`;
+      contentElement.querySelectorAll("[data-image-id]").forEach(button => {
+        const image = images.find(candidate => candidate.id === button.dataset.imageId);
+        if (image) button.addEventListener("click", () => openImage(image));
+      });
     }
 
+    document.querySelector(".modal-close").addEventListener("click", () => imageDialog.close());
+    imageDialog.addEventListener("click", event => {
+      if (event.target === imageDialog) imageDialog.close();
+    });
     refreshDevices().catch(error => contentElement.textContent = error.message);
     setInterval(() => refreshDevices().catch(console.error), 5000);
   </script>

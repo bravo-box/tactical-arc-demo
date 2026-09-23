@@ -7,13 +7,15 @@ Government:
   Entra-authenticated point-to-site VPN, optional edge site-to-site VPN, and
   WAF_v2 Application Gateway.
 - `az-tactical-demo-cloud`: private AKS, Premium private ACR, Premium private
-  Service Bus, workload identity, Log Analytics, and Application Insights.
+  Service Bus, private image Blob Storage, workload identity, Log Analytics,
+  and Application Insights.
 - `az-tactical-demo-edge`: landing resource group for Arc-managed edge
   resources created during device onboarding.
 
 Application traffic enters through Application Gateway. The AKS Application
 Gateway ingress add-on manages its backend configuration. ACR and Service Bus
-disable public access and use Azure Government private DNS zones. AKS uses
+and image storage disable public access and use Azure Government private DNS
+zones. AKS uses
 managed identity for image pulls and a federated workload identity for Service
 Bus access.
 
@@ -54,6 +56,11 @@ After onboarding an edge device to Azure Arc, set
 `edge_arc_principal_id` to its managed identity principal ID to grant it
 `Azure Service Bus Data Sender` on the `edge-heartbeat` topic. The topic also
 has a `heartbeat-monitor` subscription for heartbeat consumers.
+
+The image pipeline adds the `take-picture` queue, `image-upload` topic with an
+`image-web` subscription, and a private `device-images` blob container. The
+Arc principal receives camera commands, sends upload events, and contributes
+blobs. The AKS workload identity receives upload events and reads blobs.
 
 ## AKS workload identity
 

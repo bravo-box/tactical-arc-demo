@@ -21,6 +21,88 @@ edgeHeartbeat:
       cpu: 250m
       memory: 192Mi
 
+imagePipeline:
+  enabled: false
+
+mqtt:
+  image:
+    repository: eclipse-mosquitto
+    tag: "2.0.22"
+    pullPolicy: IfNotPresent
+  port: 1883
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 96Mi
+
+cameraCapture:
+  image:
+    repository: camera-capture
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  serviceBus:
+    existingSecret: camera-servicebus
+    connectionStringKey: connection-string
+  cameraDeviceHostPath: /dev/video0
+  videoGroupId: 44
+  config: |
+    {
+      "deviceId": "",
+      "cameraIndex": 0,
+      "serviceBusQueue": "take-picture",
+      "serviceBusFullyQualifiedNamespace": "",
+      "mqttHost": "remote-cluster-mqtt",
+      "mqttPort": 1883,
+      "mqttTopic": "edge/images/send",
+      "imageDirectory": "/var/lib/edge-images"
+    }
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+
+imageUploader:
+  image:
+    repository: image-uploader
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  serviceBus:
+    existingSecret: image-uploader-servicebus
+    connectionStringKey: connection-string
+  storage:
+    existingSecret: image-uploader-storage
+    connectionStringKey: connection-string
+  config: |
+    {
+      "mqttHost": "remote-cluster-mqtt",
+      "mqttPort": 1883,
+      "mqttTopic": "edge/images/send",
+      "imageDirectory": "/var/lib/edge-images",
+      "storageContainer": "device-images",
+      "storageAccountUrl": "",
+      "imageUploadTopic": "image-upload",
+      "serviceBusFullyQualifiedNamespace": "",
+      "connectivityHost": "1.1.1.1",
+      "connectivityPort": 443
+    }
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+imageStorage:
+  size: 5Gi
+  storageClassName: ""
+
 imageRegistry: ""
 imagePullSecrets: []
 nameOverride: ""

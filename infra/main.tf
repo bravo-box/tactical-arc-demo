@@ -88,6 +88,7 @@ module "private_link" {
   private_endpoint_subnet_id = module.networking.private_endpoint_subnet_id
   container_registry_id      = module.cloud.container_registry_id
   servicebus_namespace_id    = module.messaging.servicebus_namespace_id
+  storage_account_id         = module.messaging.image_storage_account_id
   tags                       = local.tags
 }
 

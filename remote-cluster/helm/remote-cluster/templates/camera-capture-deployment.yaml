@@ -1,0 +1,77 @@
+{{- if .Values.imagePipeline.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "remote-cluster.fullname" . }}-camera-capture
+  labels:
+    {{- include "remote-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/component: camera-capture
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "remote-cluster.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: camera-capture
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ .Values.cameraCapture.config | sha256sum }}
+      labels:
+        {{- include "remote-cluster.labels" . | nindent 8 }}
+        app.kubernetes.io/component: camera-capture
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        supplementalGroups:
+          - {{ .Values.cameraCapture.videoGroupId }}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: camera-capture
+          image: {{ if .Values.imageRegistry }}{{ .Values.imageRegistry }}/{{ end }}{{ .Values.cameraCapture.image.repository }}:{{ .Values.cameraCapture.image.tag }}
+          imagePullPolicy: {{ .Values.cameraCapture.image.pullPolicy }}
+          env:
+            - name: MQTT_HOST
+              value: {{ include "remote-cluster.fullname" . }}-mqtt
+            {{- if .Values.cameraCapture.serviceBus.existingSecret }}
+            - name: SERVICEBUS_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cameraCapture.serviceBus.existingSecret }}
+                  key: {{ .Values.cameraCapture.serviceBus.connectionStringKey }}
+            {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/camera-capture
+              readOnly: true
+            - name: images
+              mountPath: /var/lib/edge-images
+            - name: camera
+              mountPath: /dev/video0
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.cameraCapture.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "remote-cluster.fullname" . }}-image-pipeline
+            items:
+              - key: camera.json
+                path: config.json
+        - name: images
+          persistentVolumeClaim:
+            claimName: {{ include "remote-cluster.fullname" . }}-images
+        - name: camera
+          hostPath:
+            path: {{ .Values.cameraCapture.cameraDeviceHostPath }}
+            type: CharDevice
+{{- end }}

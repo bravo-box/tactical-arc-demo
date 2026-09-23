@@ -5,3 +5,7 @@ output "acr_private_endpoint_id" {
 output "servicebus_private_endpoint_id" {
   value = azurerm_private_endpoint.servicebus.id
 }
+
+output "blob_private_endpoint_id" {
+  value = azurerm_private_endpoint.blob.id
+}

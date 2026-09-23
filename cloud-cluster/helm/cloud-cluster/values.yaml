@@ -13,6 +13,18 @@ telemetryApi:
     fullyQualifiedNamespace: ""
     existingSecret: heartbeat-monitor-servicebus
     connectionStringKey: connection-string
+  imageServiceBus:
+    enabled: false
+    topic: image-upload
+    subscription: image-web
+    fullyQualifiedNamespace: ""
+    existingSecret: ""
+    connectionStringKey: connection-string
+  storage:
+    container: device-images
+    accountUrl: ""
+    existingSecret: ""
+    connectionStringKey: connection-string
   workloadIdentity:
     clientId: ""
   monitor:
@@ -24,7 +36,7 @@ telemetryApi:
       memory: 64Mi
     limits:
       cpu: 500m
-      memory: 256Mi
+      memory: 384Mi
 
 imageRegistry: ""
 imagePullSecrets: []
