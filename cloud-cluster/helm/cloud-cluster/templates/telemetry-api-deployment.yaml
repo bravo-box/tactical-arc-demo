@@ -14,10 +14,16 @@ spec:
       app.kubernetes.io/component: telemetry-api
   template:
     metadata:
+      annotations:
+        checksum/servicebus: {{ .Values.telemetryApi.serviceBus | toJson | sha256sum }}
       labels:
         {{- include "cloud-cluster.labels" . | nindent 8 }}
         app.kubernetes.io/component: telemetry-api
+        {{- if .Values.telemetryApi.workloadIdentity.clientId }}
+        azure.workload.identity/use: "true"
+        {{- end }}
     spec:
+      serviceAccountName: {{ include "cloud-cluster.fullname" . }}-telemetry-api
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -33,8 +39,23 @@ spec:
             - name: http
               containerPort: 8080
           env:
-            - name: PORT
-              value: "8080"
+            - name: ServiceBus__Topic
+              value: {{ .Values.telemetryApi.serviceBus.topic | quote }}
+            - name: ServiceBus__Subscription
+              value: {{ .Values.telemetryApi.serviceBus.subscription | quote }}
+            - name: ServiceBus__FullyQualifiedNamespace
+              value: {{ .Values.telemetryApi.serviceBus.fullyQualifiedNamespace | quote }}
+            - name: Monitor__ActiveDeviceTimeoutSeconds
+              value: {{ .Values.telemetryApi.monitor.activeDeviceTimeoutSeconds | quote }}
+            - name: Monitor__MaxHeartbeatsPerDevice
+              value: {{ .Values.telemetryApi.monitor.maxHeartbeatsPerDevice | quote }}
+            {{- if .Values.telemetryApi.serviceBus.existingSecret }}
+            - name: ServiceBus__ConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetryApi.serviceBus.existingSecret }}
+                  key: {{ .Values.telemetryApi.serviceBus.connectionStringKey }}
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz

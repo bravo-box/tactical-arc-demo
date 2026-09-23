@@ -1,5 +1,6 @@
 {
-  "deviceId": "",
+  "device-name": "edge-01",
+  "healthStatus": "Green",
   "heartbeatIntervalSeconds": 5,
   "serviceBusTopic": "edge-heartbeat"
 }

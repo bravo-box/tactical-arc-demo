@@ -1,5 +1,5 @@
 telemetryApi:
-  replicaCount: 2
+  replicaCount: 1
   image:
     repository: telemetry-api
     tag: "0.1.0"
@@ -7,6 +7,17 @@ telemetryApi:
   service:
     type: ClusterIP
     port: 8080
+  serviceBus:
+    topic: edge-heartbeat
+    subscription: heartbeat-monitor
+    fullyQualifiedNamespace: ""
+    existingSecret: heartbeat-monitor-servicebus
+    connectionStringKey: connection-string
+  workloadIdentity:
+    clientId: ""
+  monitor:
+    activeDeviceTimeoutSeconds: 30
+    maxHeartbeatsPerDevice: 100
   resources:
     requests:
       cpu: 50m
