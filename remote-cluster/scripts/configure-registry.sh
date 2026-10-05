@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Create (optionally) and configure an Azure Container Registry for edge
 # device pulls: either enable anonymous pull for a lab/demo registry, or
-# create a least-privilege repository-scoped pull token.
+# grant the identity signed in to the Azure CLI an ACR role (default AcrPull)
+# so it can authenticate with Microsoft Entra ID via `az acr login`.
 #
 # Usage: configure-registry.sh --name <acrName> [options]
 set -euo pipefail
@@ -15,9 +16,8 @@ SKU="Basic"
 CREATE_RESOURCE_GROUP="false"
 CREATE_REGISTRY="false"
 ANONYMOUS_PULL="false"
-TOKEN_NAME=""
-REPOSITORIES=()
-SECRET_FILE=""
+AUTHENTICATED_PULL="false"
+ROLE="AcrPull"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -57,20 +57,20 @@ while [[ $# -gt 0 ]]; do
     ANONYMOUS_PULL="true"
     shift
     ;;
-  --pull-token)
-    TOKEN_NAME="$2"
+  --authenticated-pull)
+    AUTHENTICATED_PULL="true"
+    shift
+    ;;
+  --role)
+    ROLE="$2"
     shift 2
     ;;
-  --repository)
-    REPOSITORIES+=("$2")
-    shift 2
-    ;;
-  --secret-file)
-    SECRET_FILE="$2"
-    shift 2
+  --pull-token | --repository | --secret-file)
+    echo "$1 is no longer supported; use --authenticated-pull to grant the signed-in Azure CLI identity access." >&2
+    exit 1
     ;;
   -h | --help)
-    sed -n '2,6p' "${BASH_SOURCE[0]}"
+    sed -n '2,7p' "${BASH_SOURCE[0]}"
     exit 0
     ;;
   *)
@@ -89,12 +89,8 @@ if [ -z "${NAME}" ]; then
   echo "--name is required" >&2
   exit 1
 fi
-if [ -n "${TOKEN_NAME}" ] && [ "${ANONYMOUS_PULL}" = "true" ]; then
-  echo "--pull-token and --anonymous-pull are mutually exclusive" >&2
-  exit 1
-fi
-if [ -n "${TOKEN_NAME}" ] && [ "${#REPOSITORIES[@]}" -eq 0 ]; then
-  echo "--pull-token requires at least one --repository" >&2
+if [ "${AUTHENTICATED_PULL}" = "true" ] && [ "${ANONYMOUS_PULL}" = "true" ]; then
+  echo "--authenticated-pull and --anonymous-pull are mutually exclusive" >&2
   exit 1
 fi
 
@@ -152,49 +148,63 @@ if [ "${ANONYMOUS_PULL}" = "true" ]; then
   echo "Devices can pull images from ${LOGIN_SERVER} without credentials."
 fi
 
-if [ -n "${TOKEN_NAME}" ]; then
-  echo "Creating repository-scoped pull token '${TOKEN_NAME}'..."
-  scope_map_args=()
-  for repo in "${REPOSITORIES[@]}"; do
-    scope_map_args+=(--repository "${repo}" content/read)
-  done
-  if az acr token show --registry "${NAME}" --name "${TOKEN_NAME}" >/dev/null 2>&1; then
-    echo "Token '${TOKEN_NAME}' already exists; updating its repository scope."
-    az acr token update \
-      --registry "${NAME}" \
-      --name "${TOKEN_NAME}" \
-      "${scope_map_args[@]}" \
-      --output none
-  else
-    az acr token create \
-      --registry "${NAME}" \
-      --name "${TOKEN_NAME}" \
-      "${scope_map_args[@]}" \
-      --output none
+if [ "${AUTHENTICATED_PULL}" = "true" ]; then
+  account_name="$(az account show --query user.name --output tsv)"
+  account_type="$(az account show --query user.type --output tsv)"
+  case "${account_type}" in
+  user)
+    principal_id="$(az ad signed-in-user show --query id --output tsv)"
+    principal_type="User"
+    ;;
+  servicePrincipal)
+    principal_id="$(az ad sp show --id "${account_name}" --query id --output tsv)"
+    principal_type="ServicePrincipal"
+    ;;
+  *)
+    echo "Unsupported Azure CLI account type '${account_type}'; sign in as a user or service principal." >&2
+    exit 1
+    ;;
+  esac
+  if [ -z "${principal_id}" ]; then
+    echo "Could not resolve the object ID of the signed-in Azure CLI identity." >&2
+    exit 1
   fi
 
-  token_secret="$(
-    az acr token credential generate \
-      --registry "${NAME}" \
-      --name "${TOKEN_NAME}" \
-      --password1 \
-      --query passwords[0].value \
+  registry_id="$(az acr show --name "${NAME}" --query id --output tsv)"
+  existing="$(
+    az role assignment list \
+      --assignee "${principal_id}" \
+      --role "${ROLE}" \
+      --scope "${registry_id}" \
+      --query "length(@)" \
       --output tsv
   )"
+  if [ "${existing}" != "0" ]; then
+    echo "'${account_name}' already has '${ROLE}' on '${NAME}'."
+  else
+    echo "Granting '${ROLE}' on '${NAME}' to the signed-in identity '${account_name}'..."
+    az role assignment create \
+      --assignee-object-id "${principal_id}" \
+      --assignee-principal-type "${principal_type}" \
+      --role "${ROLE}" \
+      --scope "${registry_id}" \
+      --output none
+    echo "Role assignments can take a few minutes to propagate."
+  fi
+
+  echo "Verifying Microsoft Entra sign-in to '${NAME}'..."
+  if az acr login --name "${NAME}" --expose-token --output none 2>/dev/null; then
+    echo "The signed-in identity can obtain a registry access token."
+  else
+    echo "Warning: could not obtain a registry access token. A private registry" >&2
+    echo "requires VPN/private DNS connectivity (see configure-vpn.sh)." >&2
+  fi
 
   echo "Registry login server: ${LOGIN_SERVER}"
-  echo "Pull token username:   ${TOKEN_NAME}"
-  if [ -n "${SECRET_FILE}" ]; then
-    install -d -m 0700 "$(dirname "${SECRET_FILE}")"
-    umask 077
-    printf '%s\n' "${token_secret}" >"${SECRET_FILE}"
-    chmod 0600 "${SECRET_FILE}"
-    echo "Pull token credential written to ${SECRET_FILE} (mode 0600)."
-  else
-    echo "Pull token credential: ${token_secret}"
-  fi
+  echo "Sign in with 'az login' as '${account_name}' (or any identity granted"
+  echo "'${ROLE}'), then authenticate with: az acr login --name ${NAME}"
 fi
 
-if [ "${ANONYMOUS_PULL}" != "true" ] && [ -z "${TOKEN_NAME}" ]; then
+if [ "${ANONYMOUS_PULL}" != "true" ] && [ "${AUTHENTICATED_PULL}" != "true" ]; then
   echo "Registry login server: ${LOGIN_SERVER}"
 fi
