@@ -131,8 +131,10 @@ document's specs array.
 
 Then build a multi-architecture image and deploy the local chart. If you need
 a registry the device can reach, run `configure-registry.sh` first (see
-[`docs/edge-device-bootstrap.md`](docs/edge-device-bootstrap.md#step-4-connect-to-an-azure-container-registry)
-for the anonymous-pull and pull-token options), then on the device run
+[`docs/edge-device-bootstrap.md`](docs/edge-device-bootstrap.md#step-5-connect-to-an-azure-container-registry)
+for the Azure CLI-authenticated and anonymous-pull options, and
+[Step 4](docs/edge-device-bootstrap.md#step-4-connect-the-device-to-the-azure-vnet-over-vpn)
+to reach a private registry over VPN with `configure-vpn.sh`), then on the device run
 `replicate-images.sh` to pre-pull the images before deploying:
 
 ```bash
