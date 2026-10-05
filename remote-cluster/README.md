@@ -6,6 +6,12 @@ device with K3s, Azure Arc-enabled Kubernetes, Service Bus, the
 The chart also contains an opt-in camera image
 pipeline for a V4L2-compatible camera such as `/dev/video0`.
 
+> New to the hardware? See
+> [`docs/edge-device-bootstrap.md`](docs/edge-device-bootstrap.md) for a
+> full runbook covering OS flashing (Raspberry Pi and Jetson Nano), Azure
+> Container Registry connectivity/image replication, Arc, Service Bus, and
+> the Helm deploy end to end.
+
 ## Prerequisites
 
 - A 64-bit Jetson Nano or Raspberry Pi is recommended. ARMv7 is also accepted
@@ -20,7 +26,14 @@ Azure public region when deploying to commercial Azure.
 
 ## 1. Install local Kubernetes
 
-Run on the device:
+First, prepare the device (package upgrade, hostname, SSH, and the cgroup
+kernel parameters K3s needs on Raspberry Pi):
+
+```bash
+sudo ./remote-cluster/scripts/prepare-device.sh --hostname edge-01
+```
+
+Then install Kubernetes:
 
 ```bash
 sudo ./remote-cluster/scripts/install-kubernetes.sh
@@ -116,7 +129,11 @@ single Cosmos DB document. Location from `location-service` becomes the
 document location, while device information fields are also represented in the
 document's specs array.
 
-Then build a multi-architecture image and deploy the local chart:
+Then build a multi-architecture image and deploy the local chart. If you need
+a registry the device can reach, run `configure-registry.sh` first (see
+[`docs/edge-device-bootstrap.md`](docs/edge-device-bootstrap.md#step-4-connect-to-an-azure-container-registry)
+for the anonymous-pull and pull-token options), then on the device run
+`replicate-images.sh` to pre-pull the images before deploying:
 
 ```bash
 ./remote-cluster/scripts/build-images.sh \
@@ -129,6 +146,8 @@ Then build a multi-architecture image and deploy the local chart:
   --platform linux/amd64,linux/arm64 \
   --registry "<registry>" \
   --push
+
+./remote-cluster/scripts/replicate-images.sh --registry "<registry>"
 
 ./remote-cluster/scripts/deploy.sh \
   --registry "<registry>" \
