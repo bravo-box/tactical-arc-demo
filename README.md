@@ -17,6 +17,13 @@ Build out an application showing remote management of a device at the edge using
 | `/remote-cluster/scripts` | Edge scripts, including Kubernetes/Docker stand-up for the edge cluster. |
 | `/scripts` | General scripts for the repo. |
 
+## Edge device bootstrap
+
+For a full Raspberry Pi / Jetson Nano runbook — OS flashing, Kubernetes
+(K3s), Azure Container Registry connectivity and image replication, Azure
+Arc, Service Bus, and the Helm deploy — see
+[`remote-cluster/docs/edge-device-bootstrap.md`](remote-cluster/docs/edge-device-bootstrap.md).
+
 ## Edge camera image flow
 
 The optional image pipeline extends the heartbeat monitor without changing its
