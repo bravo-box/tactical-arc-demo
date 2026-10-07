@@ -2,15 +2,16 @@
 
 A single, start-to-finish runbook for turning a bare Raspberry Pi or NVIDIA
 Jetson Nano into a running `edge-heartbeat` node: flash the OS, stand up
-Kubernetes, pull images from an Azure Container Registry, connect to Azure
-Arc, wire up Service Bus, and deploy the Helm chart. Each automated step below
+Kubernetes, connect the device to the Azure VNet over VPN, pull images from
+an Azure Container Registry, connect to Azure Arc, wire up Service Bus, and
+deploy the Helm chart. Each automated step below
 links to the script that does the work; this guide fills in the manual,
 device-specific steps the scripts assume are already done (OS flashing, first
-boot, and registry connectivity).
+boot, and gathering the VPN/registry values).
 
 ## Who this is for
 
-Run **Steps 1-2** on your workstation (flashing media) and **Steps 3-8** on
+Run **Steps 1-2** on your workstation (flashing media) and **Steps 3-9** on
 the device itself unless noted otherwise. Device-specific call-outs are
 labeled **Raspberry Pi** or **Jetson Nano**; everything else is common to
 both.
@@ -22,11 +23,12 @@ both.
 | 1 | Flash and boot the OS | Workstation + device |
 | 2 | First-boot hardening (hostname, updates, cgroups) | Device (`prepare-device.sh`) |
 | 3 | Install Docker, K3s, and Helm | Device (`install-kubernetes.sh`) |
-| 4 | Connect to an Azure Container Registry and pull images | Workstation (`configure-registry.sh`, `build-images.sh`) + device (`replicate-images.sh`) |
-| 5 | Connect the cluster to Azure Arc | Device (`connect-arc.sh`) |
-| 6 | Configure the Service Bus channel | Workstation or device (`configure-service-bus.sh`) |
-| 7 | Configure device identity and deploy the Helm chart | Device (`deploy.sh`) |
-| 8 | Verify | Device |
+| 4 | Connect the device to the Azure VNet over VPN | Workstation (Terraform/`az`) + device (`configure-vpn.sh`) |
+| 5 | Connect to an Azure Container Registry and pull images | Workstation (`configure-registry.sh`, `build-images.sh`) + device (`replicate-images.sh`) |
+| 6 | Connect the cluster to Azure Arc | Device (`connect-arc.sh`) |
+| 7 | Configure the Service Bus channel | Workstation or device (`configure-service-bus.sh`) |
+| 8 | Configure device identity and deploy the Helm chart | Device (`deploy.sh`) |
+| 9 | Verify | Device |
 
 ## Prerequisites
 
@@ -45,8 +47,11 @@ both.
 
 - A resource group and an Azure Container Registry the device can reach
   (public-access ACR for a lab/demo, or the private Premium ACR from
-  `/infra` if the device has VPN/private DNS connectivity — see
-  [`infra/README.md`](../../infra/README.md)).
+  `/infra`, which the device reaches over the site-to-site VPN in Step 4 —
+  see [`infra/README.md`](../../infra/README.md)).
+- An Azure RBAC role that can create role assignments on the registry
+  (Owner, User Access Administrator, or Role Based Access Control
+  Administrator) for the identity running `configure-registry.sh`.
 - A Service Bus namespace (Terraform-managed, or standalone per
   `configure-service-bus.sh`).
 
@@ -56,6 +61,14 @@ both.
   long as the registry carries an ARMv7 image.
 - microSD card (32 GB+), stable 5V power supply (Jetson Nano needs 4A/5V — a
   phone charger will brown out under load), Ethernet or Wi-Fi.
+- For the private registry: outbound UDP 500 and 4500 to the Azure VPN
+  Gateway, and a known public IPv4 address for the device's site (the
+  device can sit behind NAT).
+- Azure CLI installed on the device (used by `replicate-images.sh` and
+  `connect-arc.sh`). On 64-bit Raspberry Pi OS/Ubuntu run
+  `curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash`; where no
+  package is published for the distribution (for example older JetPack
+  releases), install it with `pip install azure-cli`.
 
 ## Step 1: Flash and boot the OS
 
@@ -118,7 +131,83 @@ local image builds; add `--skip-docker` to omit it. Verify:
 kubectl get nodes
 ```
 
-## Step 4: Connect to an Azure Container Registry
+## Step 4: Connect the device to the Azure VNet over VPN
+
+The Terraform stack in `/infra` puts ACR (and Service Bus, Blob Storage, and
+Cosmos DB) behind private endpoints with public access disabled, so the
+device needs a tunnel into the VNet and a way to resolve the registry names
+to their private IPs. The device itself terminates an IKEv2 site-to-site
+tunnel (strongSwan) to the Terraform VPN Gateway. Skip this step only if you
+use a public-access registry.
+
+1. **Enable the edge site-to-site connection in Terraform (workstation).**
+   In `infra/terraform.tfvars` set `edge_vpn_enabled = true`,
+   `edge_gateway_address` to the device site's public IPv4 address (your
+   router/NAT public IP; `curl -s https://ifconfig.me` from the device), and
+   `edge_address_spaces` to the device address(es) that should use the
+   tunnel — typically the device's LAN IP as a `/32`, such as
+   `["192.168.1.50/32"]`. Use a static IP or DHCP reservation for the
+   device, and make sure these ranges do not overlap the VNet
+   (`10.40.0.0/16` by default) or K3s (`10.42.0.0/16`, `10.43.0.0/16`).
+   Supply the pre-shared key via the environment, never the tfvars file,
+   then apply:
+
+   ```bash
+   export TF_VAR_edge_shared_key="$(openssl rand -base64 32)"
+   terraform -chdir=infra apply
+   ```
+
+2. **Collect the values the device needs (workstation).**
+
+   ```bash
+   # VPN Gateway public IP
+   terraform -chdir=infra output -raw vpn_gateway_public_ip
+
+   # VNet address space (remote side of the tunnel)
+   az network vnet show --resource-group az-tactical-demo-network \
+     --name vnet-tactical-demo --query addressSpace.addressPrefixes --output tsv
+
+   # Private IPs of the ACR registry and data endpoints
+   az network private-endpoint show --resource-group az-tactical-demo-network \
+     --name pep-acr-tactical-demo \
+     --query "customDnsConfigs[].[fqdn, ipAddresses[0]]" --output tsv
+   ```
+
+   Copy the pre-shared key to the device in a mode-`0600` file (for example
+   `remote-cluster/.secrets/vpn-psk`, which is Git-ignored), using `scp` or
+   another secure channel.
+
+3. **Bring up the tunnel on the device.** Pass each private endpoint FQDN
+   and IP from the previous command as a `--host` entry. The script installs
+   strongSwan, writes `/etc/swanctl/conf.d/azure-edge.conf` (mode `0600`,
+   pre-shared key included), starts the always-on tunnel, pins the
+   registry names in a managed block of `/etc/hosts` (used by both Docker
+   and K3s/containerd), and checks HTTPS reachability of each endpoint
+   through the tunnel:
+
+   ```bash
+   sudo ./remote-cluster/scripts/configure-vpn.sh \
+     --gateway-address <vpnGatewayPublicIp> \
+     --local-id <edgeSitePublicIp> \
+     --remote-cidr 10.40.0.0/16 \
+     --local-cidr 192.168.1.50/32 \
+     --psk-file remote-cluster/.secrets/vpn-psk \
+     --host <acrName>.azurecr.us=<registryPrivateIp> \
+     --host <acrName>.usgovvirginia.data.azurecr.us=<dataPrivateIp>
+   ```
+
+   `--local-cidr` must match `edge_address_spaces`, and `--local-id` should
+   be the same public IP as `edge_gateway_address`. Re-run the script any
+   time those values or the private endpoint IPs change; it rewrites the
+   configuration and the `/etc/hosts` block in place. Check the tunnel with
+   `sudo swanctl --list-sas`. Use `--ike-proposals`/`--esp-proposals` if you
+   applied a custom IPsec policy to the Azure connection.
+
+   Azure Government also needs the device to reach the public Microsoft
+   Entra ID and Azure Resource Manager endpoints for `az login`, Arc, and
+   ACR token exchange; only VNet traffic is sent through the tunnel.
+
+## Step 5: Connect to an Azure Container Registry
 
 This step builds images on your workstation, pushes them to ACR, and pulls
 ("replicates") them down to the device.
@@ -131,26 +220,29 @@ This step builds images on your workstation, pushes them to ACR, and pulls
    create a standalone one.
 
    ```bash
-   # Simplest for a lab/demo: allow unauthenticated pulls from the device
+   # Recommended: grant the identity signed in to the Azure CLI AcrPull on
+   # the registry so it authenticates with Microsoft Entra ID (az acr login)
+   ./remote-cluster/scripts/configure-registry.sh \
+     --name <acrName> \
+     --authenticated-pull
+
+   # Or, for a lab/demo only: allow unauthenticated pulls from the device
    ./remote-cluster/scripts/configure-registry.sh \
      --name <acrName> \
      --anonymous-pull
-
-   # Or, for authenticated pulls, create a least-privilege repository-pull token
-   ./remote-cluster/scripts/configure-registry.sh \
-     --name <acrName> \
-     --pull-token edge-pull \
-     --repository edge-heartbeat \
-     --repository device-service \
-     --repository location-service \
-     --secret-file remote-cluster/.secrets/acr-pull-credential
    ```
 
-   The Terraform ACR disables public access by default, which requires the
-   device to have VPN or private DNS connectivity regardless of which option
-   above you choose. The script prints (and, with `--secret-file`, saves to a
-   mode-`0600` file) the registry login server and, for the token path, the
-   pull credential.
+   With `--authenticated-pull`, the script resolves the signed-in Azure CLI
+   user (or service principal), assigns it `AcrPull` on the registry if it
+   doesn't already have it (`--role` selects a different role, such as
+   `AcrPush` for the workstation identity that pushes images), and checks
+   that it can obtain a registry access token. Run it once for each identity
+   that will pull — for example, sign in on the workstation as the account
+   you'll later use with `az login` on the device. No registry tokens or
+   passwords are created or stored. The Terraform ACR disables public access
+   by default, so the device needs the VPN from Step 4 regardless of which
+   option you choose (and `az acr login` from the workstation needs VPN or
+   private DNS connectivity as well).
 
 2. **Build and push multi-arch images from your workstation** (requires
    Docker Buildx):
@@ -170,8 +262,8 @@ This step builds images on your workstation, pushes them to ACR, and pulls
      --push
    ```
 
-3. **Replicate the images onto the device.** Copy the repo (and the secret
-   file, if you created one) to the device, then run `replicate-images.sh`
+3. **Replicate the images onto the device.** Copy the repo to the device,
+   then run `replicate-images.sh`
    to pre-pull each image so the first Helm install doesn't stall on a slow
    link. The default image list is `edge-heartbeat`, `device-service`, and
    `location-service`; add `--image camera-capture --image image-uploader`
@@ -181,16 +273,25 @@ This step builds images on your workstation, pushes them to ACR, and pulls
    # Anonymous-pull registry: no credentials needed
    ./remote-cluster/scripts/replicate-images.sh --registry <acrLoginServer>
 
-   # Token-authenticated registry: also configure K3s (containerd) so
-   # Helm-triggered pulls succeed without a Kubernetes image pull secret
+   # Entra-authenticated registry: sign in to the Azure CLI on the device
+   # as the identity granted AcrPull, then pull with that identity and also
+   # configure K3s (containerd) so Helm-triggered pulls succeed without a
+   # Kubernetes image pull secret
+   az cloud set --name AzureUSGovernment
+   az login --use-device-code
    sudo ./remote-cluster/scripts/replicate-images.sh \
-     --registry <acrLoginServer> \
-     --username edge-pull \
-     --credential-file remote-cluster/.secrets/acr-pull-credential \
+     --acr-name <acrName> \
      --configure-k3s
    ```
 
-## Step 5: Connect Kubernetes to Azure Arc
+   `--acr-name` uses `az acr login --expose-token` with the device's Azure
+   CLI sign-in (the invoking user's, when run under `sudo`) to log Docker in
+   and to write `/etc/rancher/k3s/registries.yaml` (mode `0600`). The ACR
+   access token expires after about three hours, so run Step 8 soon after,
+   and rerun this command to refresh it before later Helm upgrades that pull
+   new images.
+
+## Step 6: Connect Kubernetes to Azure Arc
 
 ```bash
 ./remote-cluster/scripts/connect-arc.sh --list-resource-groups
@@ -205,7 +306,7 @@ one subscription. The script registers the Arc resource providers, installs
 the `connectedk8s` CLI extension, checks the local cluster, connects it (or
 reports the existing connection), and prints connectivity status.
 
-## Step 6: Configure the Service Bus channel
+## Step 7: Configure the Service Bus channel
 
 ```bash
 ./remote-cluster/scripts/configure-service-bus.sh \
@@ -221,7 +322,7 @@ credentials. Connection strings land under `remote-cluster/.secrets/` (mode
 namespace, see the Arc-identity path in
 [`remote-cluster/README.md`](../README.md#3-configure-the-heartbeat-channel).
 
-## Step 7: Configure device identity and deploy the Helm chart
+## Step 8: Configure device identity and deploy the Helm chart
 
 Edit `remote-cluster/config/edge-heartbeat.json` and
 `remote-cluster/config/device-info.json` with this device's ID and metadata
@@ -243,7 +344,7 @@ secrets directly, so the connection strings never go into Helm values or
 release history, then runs `helm upgrade --install` and waits for the
 `edge-heartbeat`, `location-service`, and `device-service` rollouts.
 
-## Step 8: Verify
+## Step 9: Verify
 
 ```bash
 kubectl -n tactical-arc get pods
@@ -274,7 +375,7 @@ Confirm in the cloud UI that the device appears and heartbeats are updating.
   recommended barrel-jack 5V/4A adapter and enable the barrel-jack power
   mode jumper (J48) if present on your carrier board.
 - `docker buildx build --platform linux/arm64` on the Nano itself is slow;
-  prefer building on the workstation (Step 4) and only pulling on the device.
+  prefer building on the workstation (Step 5) and only pulling on the device.
 
 ## Script reference
 
@@ -282,9 +383,10 @@ Confirm in the cloud UI that the device appears and heartbeats are updating.
 | --- | --- | --- |
 | `remote-cluster/scripts/prepare-device.sh` | Device | Package upgrade, hostname, SSH, cgroup kernel params |
 | `remote-cluster/scripts/install-kubernetes.sh` | Device | Docker + K3s + Helm + kubeconfig |
-| `remote-cluster/scripts/configure-registry.sh` | Workstation | Create/configure ACR: anonymous pull or a scoped pull token |
+| `remote-cluster/scripts/configure-vpn.sh` | Device | strongSwan site-to-site tunnel to the Azure VPN Gateway + private endpoint `/etc/hosts` entries |
+| `remote-cluster/scripts/configure-registry.sh` | Workstation | Create/configure ACR: anonymous pull, or grant the signed-in Azure CLI identity `AcrPull` |
 | `remote-cluster/scripts/build-images.sh` | Workstation | Build and push edge app images |
-| `remote-cluster/scripts/replicate-images.sh` | Device | Docker login + pre-pull images + optional K3s/containerd registry auth |
+| `remote-cluster/scripts/replicate-images.sh` | Device | Azure CLI (Entra) registry login + pre-pull images + optional K3s/containerd registry auth |
 | `remote-cluster/scripts/connect-arc.sh` | Device | Azure Arc onboarding |
 | `remote-cluster/scripts/configure-service-bus.sh` | Workstation or device | Service Bus topic/queue + credentials |
 | `remote-cluster/scripts/deploy.sh` | Device | Secrets + `helm upgrade --install` + rollout wait |

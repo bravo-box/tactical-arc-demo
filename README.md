@@ -20,8 +20,9 @@ Build out an application showing remote management of a device at the edge using
 ## Edge device bootstrap
 
 For a full Raspberry Pi / Jetson Nano runbook — OS flashing, Kubernetes
-(K3s), Azure Container Registry connectivity and image replication, Azure
-Arc, Service Bus, and the Helm deploy — see
+(K3s), site-to-site VPN into the Azure VNet, Azure Container Registry
+connectivity and image replication, Azure Arc, Service Bus, and the Helm
+deploy — see
 [`remote-cluster/docs/edge-device-bootstrap.md`](remote-cluster/docs/edge-device-bootstrap.md).
 
 ## Edge camera image flow
