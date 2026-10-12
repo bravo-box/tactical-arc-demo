@@ -75,6 +75,10 @@ retained. An explicit destination alias, as above for Docker Hub's `library`
 images, ensures the destination matches the chart's image repositories.
 Digest-pinned sources require a destination repository/tag alias. Blank lines
 and full-line `#` comments are allowed in image lists.
+Docker-format manifests may be converted to OCI format during download.
+All platforms are retained, but upstream manifest digests/signatures are not
+guaranteed to survive that conversion; destination tags refer to the bundled
+OCI content.
 
 For the cloud chart, use
 `--chart oci://source.example.com/charts/cloud-cluster --chart-version 0.2.0`
@@ -140,3 +144,9 @@ Use **Terminal → Run Task**:
 Authenticate in the terminal first. Paths may be absolute or relative to the
 workspace root. The tasks use process arguments rather than shell
 interpolation, so spaces and shell metacharacters in inputs are not executed.
+
+Run the transfer scripts' offline unit tests without registry credentials:
+
+```bash
+python3 -m unittest discover -s scripts -p test_airgap.py -v
+```

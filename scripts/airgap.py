@@ -229,6 +229,7 @@ def validate_bundle(root):
     require(isinstance(images, list) and images, "missing bundle images")
     seen = set()
     allowed = {chart["file"]}
+    allowed_directories = {"chart", "images"}
     for i, image in enumerate(images):
         require(isinstance(image, dict) and set(image) == {"source", "destination", "layout"},
                 "invalid image metadata")
@@ -237,6 +238,8 @@ def validate_bundle(root):
         seen.add(parsed["destination"])
         require(image["layout"] == f"images/{i:04d}", "invalid image layout path")
         layout = safe_path(root, image["layout"])
+        allowed_directories.update((image["layout"], image["layout"] + "/blobs",
+                                    image["layout"] + "/blobs/sha256"))
         layout_files = [name for name in files if name.startswith(image["layout"] + "/")]
         for name in layout_files:
             relative = name[len(image["layout"]) + 1:]
@@ -246,6 +249,10 @@ def validate_bundle(root):
         validate_layout(layout)
         allowed.update(layout_files)
     require(set(files) == allowed, "unexpected artifacts outside chart and image layouts")
+    for directory, directories, _ in os.walk(root, followlinks=False):
+        for name in directories:
+            relative = (Path(directory) / name).relative_to(root).as_posix()
+            require(relative in allowed_directories, "unexpected bundle directory: " + relative)
     return manifest
 
 
@@ -300,7 +307,7 @@ def download(args):
         (stage / "images").mkdir()
         for i, image in enumerate(images):
             image["layout"] = f"images/{i:04d}"
-            run(["skopeo", "copy", "--all", "--preserve-digests",
+            run(["skopeo", "copy", "--all",
                  "docker://" + image["source"], f"oci:{stage / image['layout']}:bundle"])
         manifest = {
             "schema_version": 1,

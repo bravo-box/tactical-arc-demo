@@ -153,7 +153,7 @@ class BundleTests(unittest.TestCase):
         pulls = [command for command in self.commands if command[0] == "skopeo"]
         self.assertEqual(len(pulls), 2)
         for command in pulls:
-            self.assertEqual(command[:4], ["skopeo", "copy", "--all", "--preserve-digests"])
+            self.assertEqual(command[:3], ["skopeo", "copy", "--all"])
             self.assertTrue(command[-1].endswith(":bundle"))
         self.commands.clear()
         result, output = self.upload()
@@ -169,6 +169,16 @@ class BundleTests(unittest.TestCase):
                          ["helm", "push", str(self.bundle / manifest["chart"]["file"]),
                           "oci://target.internal:5000/offline/charts"])
         self.assertFalse(any("login" in c or "--tls-verify=false" in c for c in self.commands))
+
+    def test_download_permits_manifest_conversion_for_digest_pinned_images(self):
+        source = "docker.io/library/busybox@sha256:" + "a" * 64
+        self.assertEqual(self.download(["--image", source + "=busybox:offline"]), 0)
+        copy = next(command for command in self.commands if command[0] == "skopeo")
+        self.assertEqual(copy[:3], ["skopeo", "copy", "--all"])
+        self.assertEqual(copy[3], "docker://" + source)
+        self.assertNotIn("--preserve-digests", copy)
+        self.assertNotIn("--format", copy)
+        self.assertEqual(airgap.validate_bundle(self.bundle)["images"][0]["source"], source)
 
     def test_images_file_comments_and_duplicates(self):
         images = self.root / "images.txt"
@@ -288,6 +298,35 @@ class BundleTests(unittest.TestCase):
         self.commands.clear()
         (self.bundle / "images/0000/credentials.json").write_text("{}")
         self.update_manifest(lambda m: m.update(files=airgap.inventory(self.bundle)))
+        self.assertEqual(self.upload()[0], 1)
+        self.assertEqual(self.commands, [])
+
+    def test_unexpected_empty_directory(self):
+        self.assertEqual(self.download(), 0)
+        self.commands.clear()
+        (self.bundle / "unexpected").mkdir()
+        self.assertEqual(self.upload()[0], 1)
+        self.assertEqual(self.commands, [])
+
+    def test_manifest_layout_and_root_symlinks(self):
+        self.assertEqual(self.download(), 0)
+        self.commands.clear()
+        for relative in ("manifest.json", "images/0000/oci-layout",
+                         "images/0001/index.json"):
+            with self.subTest(path=relative):
+                path = self.bundle / relative
+                external = self.root / "external"
+                original = path.read_bytes()
+                external.write_bytes(original)
+                path.unlink()
+                path.symlink_to(external)
+                self.assertEqual(self.upload()[0], 1)
+                path.unlink()
+                path.write_bytes(original)
+                external.unlink()
+        real = self.root / "real-bundle"
+        self.bundle.rename(real)
+        self.bundle.symlink_to(real, target_is_directory=True)
         self.assertEqual(self.upload()[0], 1)
         self.assertEqual(self.commands, [])
 
