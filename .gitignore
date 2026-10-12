@@ -22,5 +22,7 @@ obj/
 
 # Local tooling
 .kube/
-.vscode/
+.vscode/*
+!.vscode/tasks.json
+airgap-bundles/
 remote-cluster/.secrets/

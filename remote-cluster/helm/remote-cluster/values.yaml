@@ -46,6 +46,10 @@ locationService:
     repository: location-service
     tag: "0.1.0"
     pullPolicy: IfNotPresent
+  initImage:
+    repository: busybox
+    tag: "1.36"
+    pullPolicy: IfNotPresent
   deviceId: edge-01
   locationHostPath: /var/lib/tactical-arc/location
   serviceBus:

@@ -159,6 +159,15 @@ Verify the tooling inside the container with:
 ./scripts/verify-tools.sh --check-ssh # also test SSH auth against github.com
 ```
 
+## Air-gap artifact transfer
+
+Download OCI Helm charts and multi-architecture container images into portable
+bundles, then upload them to a registry inside the air gap using
+`scripts/download-airgap.sh` and `scripts/upload-airgap.sh`.
+VS Code download/upload tasks are included.
+See [the air-gap workflow](scripts/README.md#air-gap-registry-transfer) for
+authentication, complete image lists, and deployment instructions.
+
 ## Linting
 
 ```bash
