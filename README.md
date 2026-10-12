@@ -2,6 +2,90 @@
 
 Build out an application showing remote management of a device at the edge using Arc, and connecting to a the cloud for data and telemetry.
 
+## Solution architecture
+
+```mermaid
+flowchart LR
+    operator["Operator / browser"]
+
+    subgraph gov["Azure Government"]
+        arc["Azure Arc"]
+        subgraph vnet["Private Azure virtual network"]
+            gateway["Application Gateway"]
+            subgraph aks["AKS cloud cluster"]
+                api["Telemetry API<br/>web UI and REST API"]
+            end
+            bus["Service Bus<br/>edge-heartbeat topic<br/>take-picture and update-location queues<br/>image-upload topic"]
+            cosmos["Cosmos DB<br/>device state and history"]
+            blobs["Private Blob Storage<br/>device images"]
+            acr["Private Container Registry"]
+        end
+        terraform["Terraform-provisioned<br/>network, AKS, identity, and data services"]
+    end
+
+    subgraph site["Edge site"]
+        subgraph k3s["Arc-enabled K3s cluster"]
+            heartbeat["edge-heartbeat"]
+            device["device-service"]
+            location["location-service"]
+            mqtt["Local MQTT broker"]
+            camera["camera-capture<br/>(optional)"]
+            uploader["image-uploader<br/>(optional)"]
+            edgeData["Device config, location file,<br/>and persistent image queue"]
+        end
+        hardware["Edge device<br/>camera (optional)"]
+    end
+
+    operator --> gateway --> api
+    bus -->|heartbeat-monitor subscription| api
+    api -->|persist device state| cosmos
+    api -->|read image content| blobs
+    api -->|capture request| bus
+    api -->|location update| bus
+    bus -->|device session| camera
+    bus -->|device session| location
+    heartbeat -->|device info and location requests| mqtt
+    device --> mqtt
+    location --> mqtt
+    heartbeat -->|heartbeat events| bus
+    camera -->|capture command| hardware
+    camera -->|SendImage event| mqtt
+    mqtt -->|image event| uploader
+    uploader -->|upload image| blobs
+    uploader -->|ImageUpload event| bus
+    bus -->|image-web subscription| api
+    uploader -->|request device info and location| mqtt
+    device --> edgeData
+    location --> edgeData
+    camera --> edgeData
+    uploader --> edgeData
+    k3s -. "Arc management" .-> arc
+    site -. "optional site-to-site VPN" .-> vnet
+    acr -. "container images" .-> aks
+    acr -. "container images" .-> k3s
+    terraform -. "provisions" .-> vnet
+    terraform -. "provisions" .-> bus
+    terraform -. "provisions" .-> cosmos
+    terraform -. "provisions" .-> blobs
+```
+
+### Component descriptions
+
+| Component | Responsibility |
+| --- | --- |
+| **Terraform infrastructure** | Provisions the Azure Government network, private AKS cluster, private registry and data services, managed identities, and the edge landing resource group. |
+| **Application Gateway** | Provides the cloud application's ingress into AKS. |
+| **AKS and Telemetry API** | Runs the cloud web UI and REST API. It consumes device events, maintains per-device state, and supports camera and location commands. AKS workload identity grants the API data-plane access without embedded credentials. |
+| **Azure Arc** | Connects the edge Kubernetes cluster to Azure for management. The edge site's VPN provides private network connectivity to Azure resources. |
+| **Service Bus** | Carries edge heartbeats, image-upload notifications, and session-targeted camera and location commands. |
+| **Cosmos DB** | Stores one device document per device, including bounded heartbeat and image metadata histories and the latest location and device specifications. |
+| **Private Blob Storage** | Holds uploaded image bytes; Cosmos DB stores their metadata. |
+| **Private Container Registry** | Stores application images for cloud and edge deployments. Edge images can be replicated to a registry reachable by the device. |
+| **Edge K3s workloads** | `edge-heartbeat` gathers device information and location over MQTT and publishes heartbeats. `device-service` and `location-service` serve local requests; location updates are persisted on the device. |
+| **Local MQTT broker** | Routes correlated requests and responses among the edge workloads without sending local device traffic to the cloud. |
+| **Optional camera pipeline** | `camera-capture` receives a device-targeted command, captures an image, and queues it locally. `image-uploader` enriches and uploads queued images, then notifies the cloud. The image pipeline is disabled by default. |
+| **Edge device storage and hardware** | Host-mounted files preserve device configuration and location, while a persistent volume buffers images until upload succeeds. A V4L2-compatible camera is optional. |
+
 ## Repository layout
 
 | Path | Purpose |
