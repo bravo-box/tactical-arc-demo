@@ -1,0 +1,63 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Air gap: download chart and images",
+      "type": "process",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/scripts/download-airgap.sh",
+        "--chart", "${input:airgapChart}",
+        "--chart-version", "${input:airgapChartVersion}",
+        "--images-file", "${input:airgapImagesFile}",
+        "--bundle", "${input:airgapBundle}"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Air gap: upload chart and images",
+      "type": "process",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/scripts/upload-airgap.sh",
+        "--bundle", "${input:airgapBundle}",
+        "--registry", "${input:airgapTargetRegistry}"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "airgapChart",
+      "type": "promptString",
+      "description": "Source OCI Helm chart (oci://registry/path/chart)",
+      "default": "oci://source.example.com/charts/remote-cluster"
+    },
+    {
+      "id": "airgapChartVersion",
+      "type": "promptString",
+      "description": "Published chart version",
+      "default": "0.3.1"
+    },
+    {
+      "id": "airgapImagesFile",
+      "type": "promptString",
+      "description": "Image list file (one source[=destination-repository:tag] per line)",
+      "default": "airgap-bundles/edge-images.txt"
+    },
+    {
+      "id": "airgapBundle",
+      "type": "promptString",
+      "description": "Bundle directory (must not exist when downloading)",
+      "default": "airgap-bundles/edge-0.3.1"
+    },
+    {
+      "id": "airgapTargetRegistry",
+      "type": "promptString",
+      "description": "Destination registry host[:port][/prefix], without a URL scheme",
+      "default": "registry.example.internal/tactical"
+    }
+  ]
+}

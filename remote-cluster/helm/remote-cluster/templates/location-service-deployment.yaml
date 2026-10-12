@@ -31,7 +31,8 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: initialize-location
-          image: busybox:1.36
+          image: {{ if .Values.imageRegistry }}{{ .Values.imageRegistry }}/{{ end }}{{ .Values.locationService.initImage.repository }}:{{ .Values.locationService.initImage.tag }}
+          imagePullPolicy: {{ .Values.locationService.initImage.pullPolicy }}
           command:
             - sh
             - -c
