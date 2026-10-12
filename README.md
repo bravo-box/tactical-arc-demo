@@ -37,7 +37,6 @@ flowchart LR
     end
 
     operator --> gateway --> api
-    api <-->|consume heartbeats| bus
     bus -->|heartbeat-monitor subscription| api
     api -->|persist device state| cosmos
     api -->|read image content| blobs
@@ -60,8 +59,8 @@ flowchart LR
     location --> edgeData
     camera --> edgeData
     uploader --> edgeData
-    gateway <-->|private ingress| aks
     k3s -. "Arc management" .-> arc
+    site -. "optional site-to-site VPN" .-> vnet
     acr -. "container images" .-> aks
     acr -. "container images" .-> k3s
     terraform -. "provisions" .-> vnet
@@ -76,7 +75,7 @@ flowchart LR
 | --- | --- |
 | **Terraform infrastructure** | Provisions the Azure Government network, private AKS cluster, private registry and data services, managed identities, and the edge landing resource group. |
 | **Application Gateway** | Provides the cloud application's ingress into AKS. |
-| **AKS and Telemetry API** | Runs the cloud web UI and REST API. It consumes device events, maintains per-device state, and supports camera and location commands. |
+| **AKS and Telemetry API** | Runs the cloud web UI and REST API. It consumes device events, maintains per-device state, and supports camera and location commands. AKS workload identity grants the API data-plane access without embedded credentials. |
 | **Azure Arc** | Connects the edge Kubernetes cluster to Azure for management. The edge site's VPN provides private network connectivity to Azure resources. |
 | **Service Bus** | Carries edge heartbeats, image-upload notifications, and session-targeted camera and location commands. |
 | **Cosmos DB** | Stores one device document per device, including bounded heartbeat and image metadata histories and the latest location and device specifications. |
